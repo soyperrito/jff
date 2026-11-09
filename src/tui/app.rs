@@ -129,6 +129,7 @@ impl App {
 
         self.status = None;
         self.load(entry);
+        self.focus = Focus::Content;
 
         if self.status.is_none() {
             self.status = Some("back".to_string());

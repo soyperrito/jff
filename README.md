@@ -151,7 +151,8 @@ Keys:
 | `PgUp`/`PgDn`, `Space`, `Ctrl+u`/`Ctrl+d` | page |
 | `g`/`G`, `Home`/`End` | top/bottom |
 | `Enter` | open selected related entry |
-| `←`/`h`, `Esc`/`Backspace` | back |
+| `←` / `h`, `Ctrl+←` / `Alt+←` | back in history |
+| `Esc` / `Backspace` | back; quit at the root |
 | `e` | edit |
 | `r` | reload |
 | `q` | quit |

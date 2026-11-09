@@ -736,7 +736,7 @@ jff concept "Water Pollution"
 | `Ctrl+u` / `Ctrl+d` | página |
 | `g` / `G`, `Home` / `End` | inicio/final |
 | `Enter` | enfocar relacionados o abrir el seleccionado |
-| `←` / `h` | volver en el historial |
+| `←` / `h`, `Ctrl+←` / `Alt+←` | volver en el historial |
 | `e` | editar con el editor configurado |
 | `r` | recargar la entrada |
 | `Esc` / `Backspace` | volver; salir en la raíz |

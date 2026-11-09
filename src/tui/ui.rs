@@ -586,7 +586,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else {
         Style::default()
     };
-    let keys = "Tab focus · ↑↓/jk move · Enter open · e edit · r reload · Esc back · q quit";
+    let keys = "Tab focus · ↑↓/jk move · Enter open · e edit · r reload · ←/Esc back · q quit";
 
     frame.render_widget(
         Paragraph::new(vec![

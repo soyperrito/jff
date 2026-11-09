@@ -94,7 +94,7 @@ fn handle_key(app: &mut App, key: KeyEvent) -> Outcome {
         }
         KeyCode::Char('?') => {
             app.status = Some(
-                "Tab: focus · j/k or arrows: move · Enter: open · e: edit · r: reload · Esc: back · q: quit"
+                "Tab: focus · j/k or arrows: move · Enter: open · e: edit · r: reload · ←/Ctrl+←: back · q: quit"
                     .to_string(),
             );
             return Outcome::Continue;
@@ -110,6 +110,13 @@ fn handle_key(app: &mut App, key: KeyEvent) -> Outcome {
         KeyCode::Tab | KeyCode::BackTab => {
             app.toggle_focus();
             app.status = Some(format!("focus: {}", app.focus.label()));
+            return Outcome::Continue;
+        }
+        KeyCode::Left | KeyCode::Char('h') => {
+            if !app.back() {
+                app.status = Some("no previous entry".to_string());
+            }
+
             return Outcome::Continue;
         }
         KeyCode::Esc | KeyCode::Backspace => {
@@ -157,9 +164,6 @@ fn handle_key(app: &mut App, key: KeyEvent) -> Outcome {
             KeyCode::Home | KeyCode::Char('g') => app.select_first(),
             KeyCode::End | KeyCode::Char('G') => app.select_last(),
             KeyCode::Enter => app.open_selected(),
-            KeyCode::Left | KeyCode::Char('h') if !app.back() => {
-                app.focus = Focus::Content;
-            }
             _ => {}
         },
     }
@@ -394,6 +398,40 @@ mod tests {
             },
         );
         assert_eq!(app.scroll, 0);
+    }
+
+    #[test]
+    fn ctrl_left_goes_back_from_related_focus() {
+        let (_directory, mut app) = app_with_long_note();
+        draw(&mut app);
+
+        app.focus = Focus::Related;
+        app.history.push(app.current.clone());
+
+        handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL),
+        );
+
+        assert!(app.history.is_empty());
+        assert_eq!(app.focus, Focus::Content);
+    }
+
+    #[test]
+    fn plain_left_and_h_go_back() {
+        let (_directory, mut app) = app_with_long_note();
+        draw(&mut app);
+
+        app.history.push(app.current.clone());
+        handle_key(&mut app, KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+        assert!(app.history.is_empty());
+
+        app.history.push(app.current.clone());
+        handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE),
+        );
+        assert!(app.history.is_empty());
     }
 
     #[test]
