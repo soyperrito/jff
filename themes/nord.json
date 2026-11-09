@@ -1,0 +1,17 @@
+{
+  "title": "#88C0D0",
+  "text": "#D8DEE9",
+  "muted": "#616E88",
+  "border": "#4C566A",
+  "accent": "#8FBCBB",
+  "related": "#EBCB8B",
+  "status": "#A3BE8C",
+  "error": "#BF616A",
+  "code": "#E5E9F0",
+  "code_bg": "#3B4252",
+  "image": "#81A1C1",
+  "highlight_fg": "#ECEFF4",
+  "highlight_bg": "#434C5E",
+  "scrollbar": "#434C5E",
+  "scrollbar_thumb": "#88C0D0"
+}

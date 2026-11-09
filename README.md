@@ -328,12 +328,30 @@ keys fall back to the default palette. The file may be a flat palette:
 }
 ```
 
-or wrapped in a `colors` object. A complete Dracula example is included in the
-repository at `themes/dracula.json`:
+or wrapped in a `colors` object. The repository includes five ready-to-use
+themes:
+
+| Theme | File |
+|---|---|
+| Dracula | `themes/dracula.json` |
+| Monokai Pro | `themes/monokai.json` |
+| Nord | `themes/nord.json` |
+| Forrest | `themes/forrest.json` |
+| Hacker | `themes/hacker.json` |
 
 ```sh
 mkdir -p ~/.jff/themes
-cp themes/dracula.json ~/.jff/themes/dracula.json
+cp themes/*.json ~/.jff/themes/
+```
+
+Then pick one:
+
+```json
+{
+  "colors": {
+    "theme": "themes/nord.json"
+  }
+}
 ```
 
 A missing or invalid theme is reported as an error. `jff config init` creates

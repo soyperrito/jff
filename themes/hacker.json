@@ -1,0 +1,17 @@
+{
+  "title": "#00FF41",
+  "text": "#00FF41",
+  "muted": "#008F11",
+  "border": "#00AA22",
+  "accent": "#00FF41",
+  "related": "#33FF33",
+  "status": "#00FF41",
+  "error": "#FF3131",
+  "code": "#00FF41",
+  "code_bg": "#001100",
+  "image": "#00FF41",
+  "highlight_fg": "#000000",
+  "highlight_bg": "#00FF41",
+  "scrollbar": "#005500",
+  "scrollbar_thumb": "#00FF41"
+}

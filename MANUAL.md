@@ -587,19 +587,27 @@ También se acepta envuelto en `colors`:
 }
 ```
 
-Tema Dracula incluido en el repositorio:
+Temas incluidos en el repositorio:
+
+| Tema | Archivo |
+|---|---|
+| Dracula | `themes/dracula.json` |
+| Monokai Pro | `themes/monokai.json` |
+| Nord | `themes/nord.json` |
+| Forrest | `themes/forrest.json` |
+| Hacker | `themes/hacker.json` |
 
 ```sh
 mkdir -p ~/.jff/themes
-cp themes/dracula.json ~/.jff/themes/dracula.json
+cp themes/*.json ~/.jff/themes/
 ```
 
-Configurar:
+Configurar uno:
 
 ```json
 {
   "colors": {
-    "theme": "themes/dracula.json"
+    "theme": "themes/nord.json"
   }
 }
 ```

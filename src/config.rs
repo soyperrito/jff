@@ -414,6 +414,37 @@ mod tests {
     }
 
     #[test]
+    fn repository_themes_are_valid() {
+        let themes = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("themes");
+        let mut checked = 0;
+
+        for entry in std::fs::read_dir(themes).expect("themes dir") {
+            let path = entry.expect("theme entry").path();
+
+            if path.extension().and_then(|value| value.to_str()) != Some("json") {
+                continue;
+            }
+
+            let contents = std::fs::read_to_string(&path).expect("read theme");
+            let value: serde_json::Value = serde_json::from_str(&contents).expect("valid JSON");
+            let value = value.get("colors").cloned().unwrap_or(value);
+            let palette: ThemeColors = serde_json::from_value(value).expect("valid theme palette");
+
+            assert!(
+                !palette.title.is_empty(),
+                "{} has no title color",
+                path.display()
+            );
+            checked += 1;
+        }
+
+        assert_eq!(
+            checked, 5,
+            "expected dracula, monokai, nord, forrest and hacker"
+        );
+    }
+
+    #[test]
     fn accepts_arrays_and_strings() {
         let config: Config =
             serde_json::from_str(r#"{"images": {"mime": ["png", "jpg"], "exclude": "gif,webp"}}"#)
