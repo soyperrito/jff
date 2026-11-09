@@ -519,6 +519,9 @@ jff config show       # imprime la configuración efectiva, con tema aplicado
 
 Notas:
 
+- Para usar un tema, reemplaza todo el bloque `colors` por
+  `{ "theme": "themes/dracula.json" }`. Los colores inline se ignoran
+  automáticamente; consulta la sección 10.
 - `git` está reservado para la fase 3; el autopush todavía no está
   implementado.
 - `font` está reservado para un futuro renderizador gráfico; una TUI no usa
@@ -548,15 +551,44 @@ Notas:
 
 ## 10. Temas de colores
 
-En `config.json`:
+### 10.1 Cómo cambiar los colores usando un tema
 
-```json
-{
-  "colors": {
-    "theme": "themes/dracula.json"
-  }
-}
-```
+1. Copia los temas al store:
+
+   ```sh
+   mkdir -p ~/.jff/themes
+   cp themes/*.json ~/.jff/themes/
+   ```
+
+2. Edita `~/.jff/config.json` y deja **solo** el tema dentro de `colors`:
+
+   ```json
+   {
+     "colors": {
+       "theme": "themes/dracula.json"
+     }
+   }
+   ```
+
+3. Verifica la paleta efectiva:
+
+   ```sh
+   jff config show | jq '.colors'
+   ```
+
+4. Abre la TUI:
+
+   ```sh
+   jff -t Water
+   ```
+
+**Importante:** no hay una opción adicional para “desactivar los colores por
+defecto”. En cuanto defines `colors.theme`, todos los colores inline de
+`config.json` se ignoran automáticamente. Se recomienda borrar las claves
+inline para que no haya confusión. Si quieres volver a los colores inline,
+pon `"theme": null` y añade las claves que necesites.
+
+### 10.2 Estructura del tema
 
 Cuando `theme` está definido:
 
@@ -587,6 +619,8 @@ También se acepta envuelto en `colors`:
 }
 ```
 
+### 10.3 Temas incluidos
+
 Temas incluidos en el repositorio:
 
 | Tema | Archivo |
@@ -611,6 +645,8 @@ Configurar uno:
   }
 }
 ```
+
+Cambiar de tema es simplemente cambiar el valor de `theme` y reiniciar la TUI.
 
 Ver la configuración efectiva:
 

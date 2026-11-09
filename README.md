@@ -286,6 +286,10 @@ from the specification is accepted as an alias for `weight`.
 Git credentials are **not** stored in the config: `token_env` names the
 environment variable that will hold the token once Git sync is implemented.
 
+To use a theme, replace the whole `colors` block with
+`{ "theme": "themes/dracula.json" }`. Inline color keys are then ignored
+automatically; see [Themes](#themes).
+
 Every color can be overridden in `colors`. Values accept `#RRGGBB`, ANSI names
 such as `red` or `dark-gray`, indexed colors such as `42`, and `default` for
 the terminal default:
@@ -305,7 +309,8 @@ the terminal default:
 
 ### Themes
 
-Set `colors.theme` to use a theme file instead of the inline colors:
+Set `colors.theme` to use a theme file instead of the inline colors. The
+recommended configuration is to leave **only** the theme inside `colors`:
 
 ```json
 {
@@ -315,10 +320,12 @@ Set `colors.theme` to use a theme file instead of the inline colors:
 }
 ```
 
-The file is expected at `~/.jff/themes/dracula.json`. Relative paths resolve
-from `~/.jff`; `~/...` and absolute paths are also accepted. When `theme` is
-set, **all inline color keys in `config.json` are ignored**, and missing theme
-keys fall back to the default palette. The file may be a flat palette:
+When `theme` is set, **all inline color keys in `config.json` are ignored**.
+There is no separate "disable defaults" flag: defining `theme` disables the
+inline palette automatically. Removing the inline keys is recommended to avoid
+confusion. The file is expected at `~/.jff/themes/dracula.json`. Relative paths
+resolve from `~/.jff`; `~/...` and absolute paths are also accepted. Missing
+theme keys fall back to the default palette. The file may be a flat palette:
 
 ```json
 {
@@ -353,6 +360,9 @@ Then pick one:
   }
 }
 ```
+
+This replaces the default/inline colors. If you later want inline colors again,
+remove `theme` (set it to `null`) and add the color keys you need.
 
 A missing or invalid theme is reported as an error. `jff config init` creates
 the `themes/` directory for convenience.
