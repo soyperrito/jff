@@ -25,7 +25,6 @@ pub fn config_path(root: &Path) -> PathBuf {
 #[serde(default)]
 pub struct Config {
     pub editor: Editor,
-    pub images: Images,
     pub git: Git,
     pub colors: Colors,
     #[serde(rename = "border-style")]
@@ -122,67 +121,6 @@ impl Default for Editor {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Images {
-    pub enable: bool,
-    /// `auto`, `halfblocks`, `kitty`, `sixel` or `iterm2`.
-    #[serde(default = "default_image_protocol")]
-    pub protocol: String,
-    /// Optional external image viewer command. Empty/None uses the platform default.
-    pub opener: Option<String>,
-    #[serde(default = "default_image_mime", deserialize_with = "string_or_vec")]
-    pub mime: Vec<String>,
-    #[serde(default = "default_image_exclude", deserialize_with = "string_or_vec")]
-    pub exclude: Vec<String>,
-    /// Maximum image file size in kilobytes. `0` disables the check.
-    #[serde(default = "default_max_image_kb")]
-    pub max_size_kb: u64,
-    /// Maximum decoded pixel count. `0` disables the check.
-    #[serde(default = "default_max_image_pixels")]
-    pub max_pixels: u64,
-}
-
-impl Default for Images {
-    fn default() -> Self {
-        Self {
-            enable: true,
-            protocol: default_image_protocol(),
-            opener: None,
-            mime: default_image_mime(),
-            exclude: default_image_exclude(),
-            max_size_kb: default_max_image_kb(),
-            max_pixels: default_max_image_pixels(),
-        }
-    }
-}
-
-fn default_image_protocol() -> String {
-    "auto".to_string()
-}
-
-fn default_image_mime() -> Vec<String> {
-    ["jpg", "jpeg", "png"]
-        .iter()
-        .map(|value| value.to_string())
-        .collect()
-}
-
-fn default_image_exclude() -> Vec<String> {
-    ["gif", "webp"]
-        .iter()
-        .map(|value| value.to_string())
-        .collect()
-}
-
-fn default_max_image_kb() -> u64 {
-    10_240
-}
-
-fn default_max_image_pixels() -> u64 {
-    40_000_000
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
 pub struct Git {
     pub repo: Option<String>,
     pub autopush: bool,
@@ -228,9 +166,7 @@ pub struct ThemeColors {
     pub error: String,
     pub code: String,
     pub code_bg: String,
-    pub image: String,
     pub math: String,
-    pub diagram: String,
     pub highlight_fg: String,
     pub highlight_bg: String,
     pub scrollbar: String,
@@ -250,9 +186,7 @@ impl Default for ThemeColors {
             error: "#FF5555".to_string(),
             code: "#C0C0C0".to_string(),
             code_bg: "#303030".to_string(),
-            image: "#C0C0C0".to_string(),
             math: "#F1FA8C".to_string(),
-            diagram: "#FF79C6".to_string(),
             highlight_fg: "#FFFFFF".to_string(),
             highlight_bg: "#444444".to_string(),
             scrollbar: "#444444".to_string(),
@@ -304,30 +238,6 @@ impl Default for FontStyle {
     }
 }
 
-fn string_or_vec<'de, D>(deserializer: D) -> std::result::Result<Vec<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum OneOrMany {
-        One(String),
-        Many(Vec<String>),
-    }
-
-    let value = OneOrMany::deserialize(deserializer)?;
-
-    Ok(match value {
-        OneOrMany::One(text) => text
-            .split(',')
-            .map(str::trim)
-            .filter(|item| !item.is_empty())
-            .map(str::to_string)
-            .collect(),
-        OneOrMany::Many(items) => items,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,24 +247,16 @@ mod tests {
         let config: Config = serde_json::from_str(
             r#"{
                 "editor": { "name": "vim", "path": "/usr/bin/vim" },
-                "images": { "mime": "jpg,png", "exclude": "gif" },
                 "font": { "title": { "family": "Verdana", "wight": 600, "size": "30px" } }
             }"#,
         )
         .expect("config should parse");
 
         assert_eq!(config.editor.name, "vim");
-        assert_eq!(config.images.mime, ["jpg", "png"]);
-        assert_eq!(config.images.exclude, ["gif"]);
         assert_eq!(config.font.title.weight, 600);
         assert_eq!(config.git.token_env, "JFF_GIT_TOKEN");
-        assert_eq!(config.images.max_size_kb, 10_240);
-        assert_eq!(config.images.max_pixels, 40_000_000);
-        assert_eq!(config.images.protocol, "auto");
-        assert!(config.images.opener.is_none());
         assert_eq!(config.colors.palette.border, "#808080");
         assert_eq!(config.colors.palette.error, "#FF5555");
-        assert!(config.images.enable);
     }
 
     #[test]
@@ -461,15 +363,5 @@ mod tests {
             checked, 5,
             "expected dracula, monokai, nord, forrest and hacker"
         );
-    }
-
-    #[test]
-    fn accepts_arrays_and_strings() {
-        let config: Config =
-            serde_json::from_str(r#"{"images": {"mime": ["png", "jpg"], "exclude": "gif,webp"}}"#)
-                .expect("config should parse");
-
-        assert_eq!(config.images.mime, ["png", "jpg"]);
-        assert_eq!(config.images.exclude, ["gif", "webp"]);
     }
 }

@@ -1,18 +1,14 @@
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{
     Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
     Wrap,
 };
-use ratatui_image::protocol::StatefulProtocol;
-use ratatui_image::{FilterType, Resize, StatefulImage};
 
 use super::app::{App, Focus};
-use super::image::draw_quadrants;
-use super::markdown::{Block as MdBlock, DiagramRef, ImageRef};
-use super::theme::Theme;
+use super::markdown::Block as MdBlock;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
@@ -133,7 +129,7 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
         height: inner.height,
     };
 
-    let layout = content_layout(app, content_width, inner.height);
+    let layout = content_layout(app, content_width);
     let total = layout
         .last()
         .map(|entry| entry.top.saturating_add(entry.height))
@@ -184,7 +180,6 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
             width: content_area.width,
             height: visible_height,
         };
-        let fully_visible = block_top >= viewport_top && block_bottom <= viewport_bottom;
         let source = app.rendered.blocks[entry.index].clone();
 
         match source {
@@ -192,13 +187,6 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
                 let skip = viewport_top.saturating_sub(block_top);
                 let paragraph = Paragraph::new(Text::from(lines)).wrap(Wrap { trim: false });
                 frame.render_widget(paragraph.scroll((skip, 0)), rect);
-            }
-            MdBlock::Image(image) => {
-                draw_image(frame, app, &image, rect, fully_visible);
-            }
-            MdBlock::Diagram(diagram) => {
-                let skip = viewport_top.saturating_sub(block_top);
-                draw_diagram(frame, app, &diagram, rect, fully_visible, skip);
             }
         }
     }
@@ -227,7 +215,7 @@ fn render_scrollbar(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(scrollbar, area, &mut state);
 }
 
-fn content_layout(app: &App, width: u16, max_height: u16) -> Vec<LayoutEntry> {
+fn content_layout(app: &App, width: u16) -> Vec<LayoutEntry> {
     let mut layout = Vec::new();
     let mut top = 0u16;
 
@@ -240,32 +228,6 @@ fn content_layout(app: &App, width: u16, max_height: u16) -> Vec<LayoutEntry> {
                     layout.push(LayoutEntry { index, top, height });
                     top = top.saturating_add(height);
                 }
-            }
-            MdBlock::Image(_) => {
-                if top > 0 {
-                    top = top.saturating_add(1);
-                }
-
-                let limit = image_limit(top, max_height);
-                let height = image_block_height(width, limit, app.images.is_some());
-                layout.push(LayoutEntry { index, top, height });
-                top = top.saturating_add(height).saturating_add(1);
-            }
-            MdBlock::Diagram(diagram) => {
-                if top > 0 {
-                    top = top.saturating_add(1);
-                }
-
-                let can_render = app.diagrams.supports(&diagram.language) && app.images.is_some();
-                let height = if can_render {
-                    image_block_height(width, image_limit(top, max_height), true)
-                } else {
-                    let lines = diagram_source_lines(diagram, &app.theme, None);
-                    text_height(&lines, width).min(max_height).max(1)
-                };
-
-                layout.push(LayoutEntry { index, top, height });
-                top = top.saturating_add(height).saturating_add(1);
             }
         }
     }
@@ -280,239 +242,6 @@ fn text_height(lines: &[Line<'static>], width: u16) -> u16 {
 
     let paragraph = Paragraph::new(Text::from(lines.to_vec())).wrap(Wrap { trim: false });
     paragraph.line_count(width).min(u16::MAX as usize) as u16
-}
-
-fn image_limit(top: u16, max_height: u16) -> u16 {
-    let remaining = max_height.saturating_sub(top);
-
-    if top <= max_height / 2 && remaining >= 12 {
-        remaining
-    } else {
-        24.min(max_height).max(2)
-    }
-}
-
-fn image_block_height(width: u16, max_height: u16, enabled: bool) -> u16 {
-    if !enabled {
-        return 2.min(max_height);
-    }
-
-    if max_height <= 1 {
-        return max_height;
-    }
-
-    let max_rows = max_height.saturating_sub(1).max(1) as u32;
-    let rows = (u32::from(width) / 2).max(8).min(max_rows) as u16;
-    rows + 1
-}
-
-fn draw_image(frame: &mut Frame, app: &mut App, image: &ImageRef, area: Rect, fully_visible: bool) {
-    let caption = if image.alt.is_empty() {
-        image.dest.clone()
-    } else {
-        image.alt.clone()
-    };
-    let image_color = app.theme.image;
-
-    if !fully_visible {
-        draw_image_message(
-            frame,
-            area,
-            &format!("[image: {caption}] scroll to view"),
-            image_color,
-        );
-        return;
-    }
-
-    let root = app.store.root().to_path_buf();
-    let entry_path = app.current.abs_path(&root);
-    let base_dir = entry_path.parent().unwrap_or(root.as_path()).to_path_buf();
-
-    let Some(images) = app.images.as_mut() else {
-        draw_image_message(
-            frame,
-            area,
-            &format!("[image: {caption}] images disabled in config"),
-            app.theme.muted,
-        );
-        return;
-    };
-
-    let path = match images.resolve(&root, &base_dir, &image.dest) {
-        Ok(path) => path,
-        Err(error) => {
-            draw_image_message(
-                frame,
-                area,
-                &format!("[image: {caption}] {error}"),
-                app.theme.error,
-            );
-            return;
-        }
-    };
-
-    let caption_height = 1.min(area.height);
-    let image_height = area.height.saturating_sub(caption_height);
-    let image_area = Rect {
-        height: image_height,
-        ..area
-    };
-
-    let result = if image_height == 0 {
-        Ok(())
-    } else if images.uses_quadrants() {
-        match images.quadrants(&path, image_area.width, image_area.height) {
-            Ok((bitmap, _, _)) => {
-                draw_quadrants(frame.buffer_mut(), image_area, bitmap);
-                Ok(())
-            }
-            Err(error) => Err(error),
-        }
-    } else {
-        match images.protocol(&path) {
-            Ok(protocol) => {
-                let widget: StatefulImage<StatefulProtocol> =
-                    StatefulImage::new().resize(Resize::Scale(Some(FilterType::Lanczos3)));
-                frame.render_stateful_widget(widget, image_area, protocol);
-                Ok(())
-            }
-            Err(error) => Err(error),
-        }
-    };
-
-    if let Err(error) = result {
-        draw_image_message(
-            frame,
-            area,
-            &format!("[image: {caption}] {error}"),
-            app.theme.error,
-        );
-        return;
-    }
-
-    if caption_height > 0 {
-        let caption_area = Rect {
-            y: area.y + image_height,
-            height: caption_height,
-            ..area
-        };
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                format!("[image: {caption}]"),
-                Style::default().fg(image_color),
-            ))),
-            caption_area,
-        );
-    }
-}
-
-fn draw_image_message(frame: &mut Frame, area: Rect, message: &str, color: Color) {
-    if area.height == 0 {
-        return;
-    }
-
-    frame.render_widget(
-        Paragraph::new(Text::from(Line::from(Span::styled(
-            message,
-            Style::default().fg(color),
-        ))))
-        .wrap(Wrap { trim: true }),
-        area,
-    );
-}
-
-fn draw_diagram(
-    frame: &mut Frame,
-    app: &mut App,
-    diagram: &DiagramRef,
-    area: Rect,
-    fully_visible: bool,
-    skip: u16,
-) {
-    let can_render = app.diagrams.supports(&diagram.language) && app.images.is_some();
-
-    if !can_render {
-        draw_diagram_source(frame, app, diagram, area, skip, None);
-        return;
-    }
-
-    if !fully_visible {
-        draw_image_message(
-            frame,
-            area,
-            &format!("[{} diagram] scroll to view", diagram.language),
-            app.theme.diagram,
-        );
-        return;
-    }
-
-    let root = app.store.root().to_path_buf();
-
-    match app
-        .diagrams
-        .render(&root, &diagram.language, &diagram.source)
-    {
-        Ok(path) => {
-            let image = ImageRef {
-                alt: format!("{} diagram", diagram.language),
-                dest: path.to_string_lossy().into_owned(),
-            };
-            draw_image(frame, app, &image, area, true);
-        }
-        Err(error) => {
-            draw_diagram_source(frame, app, diagram, area, 0, Some(&error));
-        }
-    }
-}
-
-fn draw_diagram_source(
-    frame: &mut Frame,
-    app: &App,
-    diagram: &DiagramRef,
-    area: Rect,
-    skip: u16,
-    error: Option<&str>,
-) {
-    let lines = diagram_source_lines(diagram, &app.theme, error);
-    let paragraph = Paragraph::new(Text::from(lines)).wrap(Wrap { trim: false });
-
-    frame.render_widget(paragraph.scroll((skip, 0)), area);
-}
-
-fn diagram_source_lines(
-    diagram: &DiagramRef,
-    theme: &Theme,
-    error: Option<&str>,
-) -> Vec<Line<'static>> {
-    let mut lines = vec![Line::from(Span::styled(
-        format!("[{} diagram]", diagram.language),
-        Style::default()
-            .fg(theme.diagram)
-            .add_modifier(Modifier::BOLD),
-    ))];
-
-    if let Some(error) = error {
-        lines.push(Line::from(Span::styled(
-            format!("! {error}"),
-            Style::default().fg(theme.error),
-        )));
-    }
-
-    if diagram.source.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "  (empty diagram)",
-            Style::default().fg(theme.muted),
-        )));
-    }
-
-    for line in diagram.source.lines() {
-        lines.push(Line::from(Span::styled(
-            format!("  {line}"),
-            Style::default().fg(theme.code).bg(theme.code_bg),
-        )));
-    }
-
-    lines
 }
 
 fn draw_related(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
@@ -531,16 +260,10 @@ fn draw_related(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
         )));
 
     if app.related.is_empty() {
-        let message = vec![
-            Line::from(Span::styled(
-                "No related entries.",
-                Style::default().fg(app.theme.related),
-            )),
-            Line::from(Span::styled(
-                "Add [more:term](path), [more:concept](path) or [more:t/c](ref).",
-                Style::default().fg(app.theme.muted),
-            )),
-        ];
+        let message = vec![Line::from(Span::styled(
+            "No related entries.",
+            Style::default().fg(app.theme.related),
+        ))];
 
         frame.render_widget(
             Paragraph::new(message)
@@ -611,8 +334,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else {
         Style::default()
     };
-    let keys =
-        "Tab focus · ↑↓/jk move · Enter open · e edit · o image · r reload · ←/Esc back · q quit";
+    let keys = "Tab focus · ↑↓/jk move · Enter open · e edit · r reload · ←/Esc back · q quit";
 
     frame.render_widget(
         Paragraph::new(vec![

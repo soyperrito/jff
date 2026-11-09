@@ -9,8 +9,7 @@ priority: optional
 maintainer: Rodrigo Quintanar <djperseo@outlook.es>
 description: |
   Just for Fun - Encyclopedic Dictionary
-  Local Markdown knowledge base with a terminal UI, images,
-  math, diagrams and Git backup/load.
+  Local Markdown knowledge base with a terminal UI, math and Git backup/load.
 vendor: Rodrigo Quintanar
 homepage: https://github.com/soyperrito/jff
 license: GPL-3.0-only
@@ -21,13 +20,6 @@ depends:
   - git
   - nano
   - ca-certificates
-
-recommends:
-  - graphviz
-
-suggests:
-  - typst
-  - mermaid-cli
 
 contents:
   - src: packaging/build/jff
@@ -75,8 +67,6 @@ overrides:
       - git
       - nano
       - ca-certificates
-    recommends:
-      - graphviz
 
   rpm:
     depends:
@@ -85,5 +75,3 @@ overrides:
       - git
       - nano
       - ca-certificates
-    recommends:
-      - graphviz

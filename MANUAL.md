@@ -11,9 +11,8 @@ TUI para leer, navegar y editar.
 - **Repositorio:** <https://github.com/soyperrito/jff>
 - **Licencia:** GPL-3.0-only
 
-> Este manual documenta el estado actual: CLI, TUI, imágenes, scrollbar,
-> temas, matemáticas, diagramas y sincronización Git. Los renderizadores
-> externos de diagramas y Git son opcionales.
+> Este manual documenta el estado actual: CLI, TUI, scrollbar, temas,
+> matemáticas y sincronización Git. La sincronización Git es opcional.
 
 ---
 
@@ -30,14 +29,13 @@ TUI para leer, navegar y editar.
 9. [Configuración](#9-configuración)
 10. [Temas de colores](#10-temas-de-colores)
 11. [La TUI](#11-la-tui)
-12. [Imágenes](#12-imágenes)
-13. [Pipes y scripting](#13-pipes-y-scripting)
-14. [Códigos de salida y errores](#14-códigos-de-salida-y-errores)
-15. [Alias legacy](#15-alias-legacy)
-16. [Solución de problemas](#16-solución-de-problemas)
-17. [Matemáticas y diagramas](#17-matemáticas-y-diagramas)
-18. [Git, backup y load](#18-git-backup-y-load)
-19. [Empaquetado y distribución](#19-empaquetado-y-distribución)
+12. [Pipes y scripting](#12-pipes-y-scripting)
+13. [Códigos de salida y errores](#13-códigos-de-salida-y-errores)
+14. [Alias legacy](#14-alias-legacy)
+15. [Solución de problemas](#15-solución-de-problemas)
+16. [Matemáticas](#16-matemáticas)
+17. [Git, backup y load](#17-git-backup-y-load)
+18. [Empaquetado y distribución](#18-empaquetado-y-distribución)
 
 ---
 
@@ -46,8 +44,7 @@ TUI para leer, navegar y editar.
 Requisitos:
 
 - Rust 1.89 o superior.
-- Terminal preferiblemente con soporte de color; para imágenes, Kitty, Sixel
-  o iTerm2. Si no hay soporte gráfico se usa el fallback de half-blocks.
+- Terminal preferiblemente con soporte de color.
 
 ```sh
 cargo build --release
@@ -415,6 +412,8 @@ Reglas:
 - El panel de relacionados muestra el **primer H1** del archivo destino, no el
   título del registro.
 - Los enlaces rotos se muestran como `[missing]`.
+- Los enlaces de relacionados son metadatos: no se muestran en el panel de
+  contenido.
 
 ### 6.1 `related`
 
@@ -520,15 +519,6 @@ jff config show       # imprime la configuración efectiva, con tema aplicado
     "name": "nano",
     "path": null
   },
-  "images": {
-    "enable": true,
-    "protocol": "auto",
-    "opener": null,
-    "mime": ["jpg", "jpeg", "png"],
-    "exclude": ["gif", "webp"],
-    "max_size_kb": 10240,
-    "max_pixels": 40000000
-  },
   "git": {
     "repo": null,
     "autopush": false,
@@ -548,9 +538,7 @@ jff config show       # imprime la configuración efectiva, con tema aplicado
     "error": "#FF5555",
     "code": "#C0C0C0",
     "code_bg": "#303030",
-    "image": "#C0C0C0",
     "math": "#F1FA8C",
-    "diagram": "#FF79C6",
     "highlight_fg": "#FFFFFF",
     "highlight_bg": "#444444",
     "scrollbar": "#444444",
@@ -573,8 +561,7 @@ Notas:
 - Para usar un tema, reemplaza todo el bloque `colors` por
   `{ "theme": "themes/dracula.json" }`. Los colores inline se ignoran
   automáticamente; consulta la sección 10.
-- `git` está reservado para la fase 3; el autopush todavía no está
-  implementado.
+- `git` controla `backup`, `load` y el autopush; consulta la sección 17.
 - `font` está reservado para un futuro renderizador gráfico; una TUI no usa
   familias ni tamaños tipográficos.
 - `border-style.line` acepta `single`, `plain`, `rounded`, `thick` y `double`.
@@ -594,9 +581,7 @@ Notas:
 | `status` | Mensajes de estado |
 | `error` | Enlaces rotos y errores |
 | `code` / `code_bg` | Código inline y bloques de código |
-| `image` | Caption/placeholder de imágenes |
 | `math` | Fórmulas inline y en bloque |
-| `diagram` | Etiquetas y fuente de diagramas |
 | `highlight_fg` / `highlight_bg` | Fila seleccionada |
 | `scrollbar` / `scrollbar_thumb` | Scrollbar del contenido |
 
@@ -740,7 +725,6 @@ jff concept "Water Pollution"
 | `Enter` | enfocar relacionados o abrir el seleccionado |
 | `←` / `h`, `Ctrl+←` / `Alt+←` | volver en el historial |
 | `e` | editar con el editor configurado |
-| `o` | abrir la primera imagen en un visor externo |
 | `r` | recargar la entrada |
 | `Esc` / `Backspace` | volver; salir en la raíz |
 | `q` | salir |
@@ -749,68 +733,9 @@ jff concept "Water Pollution"
 La columna derecha del panel **Content** muestra una scrollbar. Los colores
 del track y del thumb se configuran con `scrollbar` y `scrollbar_thumb`.
 
-### 11.3 Imágenes en la TUI
-
-Las imágenes se renderizan inline cuando están completamente visibles. Si se
-hacen scroll parcial se muestra un placeholder. Se usan Kitty, Sixel o iTerm2
-si el terminal los soporta; si no, half-blocks.
-
 ---
 
-## 12. Imágenes
-
-Sintaxis Markdown:
-
-```markdown
-![Descripción](../../images/pic.png)
-![Descripción](https://example.com/pic.jpg)
-```
-
-Reglas:
-
-- Las rutas locales son relativas al Markdown que contiene la imagen.
-- Las rutas locales deben estar dentro de `~/.jff`.
-- Las URLs `http://` y `https://` se descargan una vez y se guardan en
-  `~/.jff/.cache/images/`.
-- Se aceptan rutas absolutas dentro del store.
-- Usa un terminal con Kitty, Sixel o iTerm2 para máxima nitidez. El protocolo
-  se detecta automáticamente y se puede forzar:
-  ```json
-  { "images": { "protocol": "kitty" } }
-  ```
-  Valores: `auto`, `halfblocks`, `quadrants`, `kitty`, `sixel`, `iterm2`.
-- Pulsa `o` en la TUI para abrir la primera imagen en un visor externo. Por
-  defecto se usa `xdg-open`/`open`/`start`; se puede configurar
-  `images.opener`:
-  ```json
-  { "images": { "opener": "feh" } }
-  ```
-- Los tipos permitidos y excluidos se configuran en `images.mime` y
-  `images.exclude`.
-- Límites:
-  - `max_size_kb`: tamaño del archivo; `0` desactiva.
-  - `max_pixels`: píxeles decodificados; `0` desactiva.
-- Por defecto se permiten `jpg`, `jpeg`, `png` y se excluyen `gif`, `webp`.
-- Errores posibles: archivo inexistente, ruta fuera del store, tipo excluido,
-  tamaño excedido, demasiados píxeles, formato inválido.
-
-Ejemplo de configuración:
-
-```json
-{
-  "images": {
-    "enable": true,
-    "mime": ["jpg", "jpeg", "png", "gif", "webp"],
-    "exclude": [],
-    "max_size_kb": 20480,
-    "max_pixels": 80000000
-  }
-}
-```
-
----
-
-## 13. Pipes y scripting
+## 12. Pipes y scripting
 
 `jff` detecta si la salida es un terminal. Si está canalizada:
 
@@ -819,7 +744,7 @@ Ejemplo de configuración:
 - `find`/`list`/`related` ya imprimen texto por defecto.
 - `--json` devuelve JSON utilizable con `jq`.
 
-### 13.1 Leer contenido
+### 12.1 Leer contenido
 
 ```sh
 jff -t Water | less -R
@@ -831,7 +756,7 @@ jff -t Water | sed -n '1,15p'
 jff -t Water > /tmp/water.txt
 ```
 
-### 13.2 Buscar y filtrar
+### 12.2 Buscar y filtrar
 
 ```sh
 jff find water | grep -i pollution
@@ -842,7 +767,7 @@ jff -set water | cut -f1
 jff -l Water | grep -i 'concept\|term'
 ```
 
-### 13.3 Extraer una ref y abrirla
+### 12.3 Extraer una ref y abrirla
 
 ```sh
 REF=$(jff -set water | cut -f1)
@@ -852,7 +777,7 @@ REF=$(jff find water --json | jq -r '.[0].ref')
 jff -t "$REF" | head -n 30
 ```
 
-### 13.4 JSON con `jq`
+### 12.4 JSON con `jq`
 
 `find` y `list` devuelven un array de entradas:
 
@@ -892,7 +817,7 @@ else
 fi
 ```
 
-### 13.5 Relacionados con `jq`
+### 12.5 Relacionados con `jq`
 
 `related` devuelve:
 
@@ -922,7 +847,7 @@ jff related water --json | jq -r '.related[] | select(.target == null) | .link.d
 jff -l water | grep -i 'missing'
 ```
 
-### 13.6 Recorrer entradas
+### 12.6 Recorrer entradas
 
 ```sh
 jff list --json | jq -r '.[].ref' |
@@ -936,7 +861,7 @@ done
 jff list | cut -f1 | xargs -I{} sh -c 'echo "== {}"; jff -t "{}" | head -n 3'
 ```
 
-### 13.7 Rutas de archivos
+### 12.7 Rutas de archivos
 
 Las rutas de `map.json` son relativas a `~/.jff`:
 
@@ -956,7 +881,7 @@ while read -r path; do
 done
 ```
 
-### 13.8 `fzf` opcional
+### 12.8 `fzf` opcional
 
 Si tienes `fzf`:
 
@@ -965,7 +890,7 @@ jff list --json | jq -r '.[].ref' |
 fzf --preview 'jff -t {} | head -n 60'
 ```
 
-### 13.9 Configuración y temas
+### 12.9 Configuración y temas
 
 ```sh
 jff config path
@@ -975,7 +900,7 @@ jff config show | jq -r '.colors.theme'
 jff config show | jq '.colors.scrollbar_thumb'
 ```
 
-### 13.10 Redirecciones útiles
+### 12.10 Redirecciones útiles
 
 ```sh
 jff list > /tmp/jff-list.txt
@@ -986,7 +911,7 @@ jff related water --json > /tmp/water-related.json
 
 ---
 
-## 14. Códigos de salida y errores
+## 13. Códigos de salida y errores
 
 | Código | Significado |
 |---|---|
@@ -1013,14 +938,10 @@ Errores habituales:
 - `ref ... is a concept, not a term`
 - `an entry titled ... already exists`
 - `theme error: ...`
-- `image type ... is excluded`
-- `image is too large`
-- `image has too many pixels`
-- `image path is outside the knowledge base`
 
 ---
 
-## 15. Alias legacy
+## 14. Alias legacy
 
 | Alias | Equivalente actual |
 |---|---|
@@ -1043,7 +964,7 @@ Errores habituales:
 
 ---
 
-## 16. Solución de problemas
+## 15. Solución de problemas
 
 ### La TUI no abre y sale texto
 
@@ -1053,14 +974,6 @@ canalizando o redirigiendo, es intencional:
 ```sh
 jff -t Water | cat   # fuerza salida de texto
 ```
-
-### La imagen no aparece
-
-- Comprueba que está dentro de `~/.jff`.
-- Revisa `images.enable`, `images.mime`, `images.exclude`.
-- Revisa `max_size_kb` y `max_pixels`.
-- Algunos terminales no soportan Kitty/Sixel/iTerm2; se usa half-blocks.
-- Haz scroll hasta que la imagen esté completamente visible.
 
 ### El tema no carga
 
@@ -1117,7 +1030,7 @@ git -C ~/.jff remote -v
 - `git.repo` debe estar configurado.
 - Si usas HTTPS, exporta `JFF_GIT_TOKEN` o el nombre configurado en
   `token_env`.
-- Si hay conflicto, sigue los pasos de la sección 18.5.
+- Si hay conflicto, sigue los pasos de la sección 17.5.
 - Un fallo de autopush no pierde cambios locales; ejecuta `jff backup` después
   de corregir el problema.
 - Para traer datos remotos, usa `jff load`.
@@ -1127,23 +1040,11 @@ git -C ~/.jff remote -v
 `unicodeit` cubre una parte de LaTeX. Las construcciones complejas pueden
 quedar como texto parcial; el contenido original sigue visible en el Markdown.
 
-### Un diagrama muestra solo la fuente
-
-Instala la herramienta correspondiente:
-
-```sh
-command -v mmdc
-command -v dot
-command -v typst
-```
-
-Sin herramienta, `jff` muestra la fuente del diagrama como fallback.
-
 ---
 
-## 17. Matemáticas y diagramas
+## 16. Matemáticas
 
-### 17.1 Fórmulas inline
+### 16.1 Fórmulas inline
 
 ```markdown
 La energía es $E=mc^2$ y la identidad de Euler es $e^{i\pi}+1=0$.
@@ -1153,7 +1054,7 @@ La energía es $E=mc^2$ y la identidad de Euler es $e^{i\pi}+1=0$.
 color `math`. Las fórmulas complejas pueden quedar parcialmente convertidas,
 pero el texto sigue siendo legible.
 
-### 17.2 Fórmulas en bloque
+### 16.2 Fórmulas en bloque
 
 ```markdown
 $$
@@ -1163,54 +1064,14 @@ $$
 
 Se muestran como una línea independiente, indentada y con el color `math`.
 
-### 17.3 Diagramas
-
-Bloques de código reconocidos:
-
-````markdown
-```mermaid
-graph TD
-  A[Water] --> B[Pollution]
-```
-````
-
-````markdown
-```dot
-digraph { A -> B }
-```
-````
-
-````markdown
-```typst
-#set page(width: 10cm, height: auto)
-= Diagram
-```
-````
-
-Comportamiento:
-
-- `mermaid` / `mmd` usa `mmdc`.
-- `dot` / `graphviz` usa `dot`.
-- `typst` usa `typst`.
-- Si la herramienta no está instalada, se muestra la fuente del diagrama con
-  las etiquetas y colores `diagram`/`code`.
-- Si la herramienta está instalada pero falla, se muestra el error y la fuente.
-- Las imágenes generadas se guardan en `~/.jff/.cache/diagrams/`.
-- Los colores se controlan con `math` y `diagram` en `colors` o en el tema.
-
-Comprobar herramientas:
-
-```sh
-command -v mmdc
-command -v dot
-command -v typst
-```
+Las imágenes no se renderizan. La sintaxis Markdown de imagen se muestra como
+texto, por ejemplo `[image: descripción]`.
 
 ---
 
-## 18. Git, backup y load
+## 17. Git, backup y load
 
-### 18.1 Configuración
+### 17.1 Configuración
 
 ```json
 {
@@ -1231,7 +1092,7 @@ command -v typst
 - `token_env`: nombre de la variable de entorno que contiene el token HTTPS.
   La contraseña/token **no** se guarda en `config.json`.
 
-### 18.2 Backup manual
+### 17.2 Backup manual
 
 ```sh
 export JFF_GIT_TOKEN="tu_token"
@@ -1250,7 +1111,7 @@ jff backup
 
 El primer backup contra un remoto vacío crea la rama `main`.
 
-### 18.3 Autopush
+### 17.3 Autopush
 
 Con `"autopush": true`, `jff` ejecuta un backup después de:
 
@@ -1265,7 +1126,7 @@ jff -t Water        # edición desde la TUI: suspende, edita y respalda
 Si el autopush falla, la operación local no se pierde: se muestra una
 advertencia y el cambio queda en el store para el siguiente `jff backup`.
 
-### 18.4 Load desde el remoto
+### 17.4 Load desde el remoto
 
 ```sh
 jff load
@@ -1298,7 +1159,7 @@ Comportamiento:
   - Crea `terms/` y `concepts/` si no existen.
 - El comando imprime la ruta del backup local si se creó uno.
 
-### 18.5 Conflictos del backup
+### 17.5 Conflictos del backup
 
 Antes de hacer push se ejecuta un rebase sobre el remoto. Si hay conflicto:
 
@@ -1317,7 +1178,7 @@ git rebase --continue
 jff backup
 ```
 
-### 18.6 Inspección
+### 17.6 Inspección
 
 ```sh
 git -C ~/.jff status
@@ -1328,9 +1189,9 @@ jff config show | jq '.git'
 
 ---
 
-## 19. Empaquetado y distribución
+## 18. Empaquetado y distribución
 
-### 19.1 Shell completions
+### 18.1 Shell completions
 
 ```sh
 jff completions bash > jff.bash
@@ -1356,7 +1217,7 @@ mkdir -p ~/.config/fish/completions
 jff completions fish > ~/.config/fish/completions/jff.fish
 ```
 
-### 19.2 Man page
+### 18.2 Man page
 
 ```sh
 jff man > jff.1
@@ -1370,7 +1231,7 @@ sudo install -Dm644 jff.1 /usr/local/share/man/man1/jff.1
 sudo mandb
 ```
 
-### 19.3 Makefile
+### 18.3 Makefile
 
 ```sh
 make build        # cargo build --release --locked
@@ -1392,7 +1253,7 @@ make install PREFIX=/usr/local
 make install DESTDIR=/tmp/pkg
 ```
 
-### 19.4 CI
+### 18.4 CI
 
 `.github/workflows/ci.yml` ejecuta en cada push/PR:
 
@@ -1402,7 +1263,7 @@ make install DESTDIR=/tmp/pkg
 - `cargo build --release --locked`
 - Smoke test de `completions` y `man`
 
-### 19.5 Releases
+### 18.5 Releases
 
 Un tag `v*` dispara `.github/workflows/release.yml`, que compila y publica:
 
@@ -1426,7 +1287,7 @@ Además se generan paquetes nativos:
 - `dist/jff_<version>-1_amd64.deb`
 - `dist/jff-<version>-1.x86_64.rpm`
 
-### 19.6 Paquetes .deb y .rpm
+### 18.6 Paquetes .deb y .rpm
 
 ```sh
 make packages
@@ -1440,7 +1301,6 @@ Los paquetes:
 - instalan los temas en `/usr/local/share/jff/themes/`;
 - instalan `config.default.json`, man page y completions;
 - declaran dependencias: `git`, `nano`, `ca-certificates`, `libc` y `libgcc`;
-- recomiendan `graphviz` y sugieren `typst`/`mermaid-cli`;
 - ejecutan un `postinstall` que crea `~/.jff/config.json` y copia los temas
   para los usuarios existentes y `/etc/skel`, sin sobrescribir archivos del
   usuario.

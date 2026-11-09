@@ -38,7 +38,6 @@ Requirements: Rust 1.89 or newer. Optional tools:
 
 - `git` for `jff backup` / `jff load`
 - `nano`, `vim`, `code` or `emacs` for editing
-- `graphviz`, `mmdc` or `typst` for rendering diagrams
 
 ## Quick start
 
@@ -154,13 +153,12 @@ Keys:
 | `←` / `h`, `Ctrl+←` / `Alt+←` | back in history |
 | `Esc` / `Backspace` | back; quit at the root |
 | `e` | edit |
-| `o` | open the first image with an external viewer |
 | `r` | reload |
 | `q` | quit |
 | `?` | key help |
 
-The content pane has a scrollbar on the right. Markdown, code blocks, tables,
-images, math and diagrams are rendered in the viewer.
+The content pane has a scrollbar on the right. Markdown, code blocks, tables
+and math are rendered in the viewer.
 
 ## Related links
 
@@ -177,7 +175,8 @@ In any Markdown file:
 
 Relative paths and leading-slash store paths such as `/concepts/...` are
 accepted. The related pane shows the first `# H1` of each target file.
-Unresolved links are shown as `[missing]`.
+Unresolved links are shown as `[missing]`. Related links are metadata and are
+not displayed in the content pane.
 
 ## Search and listing
 
@@ -196,55 +195,16 @@ jff -src "water pollution"
 
 Search ignores case and accents. `--json` is available for scripts.
 
-## Images, math and diagrams
-
-Images:
-
-```markdown
-![Description](../../images/picture.png)
-![Description](https://example.com/picture.jpg)
-```
-
-Local images must stay inside `~/.jff`. `http://` and `https://` images are
-downloaded once and cached under `~/.jff/.cache/images/`. Supported types and
-size limits are configured in `config.json`.
-
-For sharper images use a terminal with Kitty, Sixel or iTerm2 support. The
-protocol is auto-detected; it can be forced with `images.protocol`:
-
-```json
-{
-  "images": {
-    "protocol": "kitty"
-  }
-}
-```
-
-Values: `auto`, `halfblocks`, `quadrants`, `kitty`, `sixel`, `iterm2`. The
-half-blocks/quadrants fallback is intentionally low-resolution; choosing a
-graphics-capable terminal is the only way to get full image quality.
-
-Press `o` in the viewer to open the first image with an external viewer. By
-default `jff` uses `xdg-open` (Linux), `open` (macOS) or `start` (Windows); set
-`images.opener` to a custom command if needed.
-
-Math:
+## Math
 
 ```markdown
 $E=mc^2$
 ```
 
-Fenced diagram blocks:
+Inline and display math are converted to Unicode where possible.
 
-````markdown
-```mermaid
-graph TD
-  A[Water] --> B[Pollution]
-```
-````
-
-`mermaid`, `dot`/`graphviz` and `typst` use external tools when available;
-otherwise the source is shown.
+Images are not rendered. Markdown image syntax is shown as a text placeholder
+such as `[image: description]`.
 
 ## Configuration
 
@@ -256,15 +216,6 @@ effective configuration. A minimal example:
   "editor": {
     "name": "nano",
     "path": null
-  },
-  "images": {
-    "enable": true,
-    "protocol": "auto",
-    "opener": null,
-    "mime": ["jpg", "jpeg", "png"],
-    "exclude": ["gif", "webp"],
-    "max_size_kb": 10240,
-    "max_pixels": 40000000
   },
   "git": {
     "repo": "https://github.com/soyperrito/jff.git",

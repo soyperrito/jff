@@ -5,7 +5,6 @@ mod error;
 mod git;
 mod links;
 mod model;
-mod opener;
 mod refs;
 mod store;
 mod text;

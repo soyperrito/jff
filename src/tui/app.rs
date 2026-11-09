@@ -4,8 +4,6 @@ use crate::config::Config;
 use crate::model::Entry;
 use crate::store::{Related, Store};
 
-use super::diagram::DiagramRenderer;
-use super::image::ImageManager;
 use super::markdown;
 use super::theme::Theme;
 
@@ -31,8 +29,6 @@ pub struct App {
     pub current: Entry,
     pub content: String,
     pub rendered: markdown::Document,
-    pub images: Option<ImageManager>,
-    pub diagrams: DiagramRenderer,
     pub related: Vec<Related>,
     pub history: Vec<Entry>,
     pub focus: Focus,
@@ -45,7 +41,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(store: Store, config: Config, entry: Entry, images: Option<ImageManager>) -> Self {
+    pub fn new(store: Store, config: Config, entry: Entry) -> Self {
         let theme = Theme::from_config(&config);
         let mut app = Self {
             store,
@@ -54,8 +50,6 @@ impl App {
             current: entry.clone(),
             content: String::new(),
             rendered: markdown::Document::default(),
-            images,
-            diagrams: DiagramRenderer::new(),
             related: Vec::new(),
             history: Vec::new(),
             focus: Focus::Content,
@@ -108,10 +102,6 @@ impl App {
     pub fn reload(&mut self) {
         self.status = None;
 
-        if let Some(images) = self.images.as_mut() {
-            images.clear();
-        }
-
         let current = self.current.clone();
         self.load(current);
 
@@ -136,13 +126,6 @@ impl App {
         }
 
         true
-    }
-
-    pub fn first_image(&self) -> Option<markdown::ImageRef> {
-        self.rendered.blocks.iter().find_map(|block| match block {
-            markdown::Block::Image(image) => Some(image.clone()),
-            _ => None,
-        })
     }
 
     pub fn open_selected(&mut self) {
@@ -239,7 +222,7 @@ mod tests {
         contents.push_str("\n[more:concept](../../concepts/w/water_pollution.md)\n");
         fs::write(&term_path, contents).expect("link");
 
-        let app = App::new(store, Config::default(), water.clone(), None);
+        let app = App::new(store, Config::default(), water.clone());
         (directory, app, water, concept)
     }
 

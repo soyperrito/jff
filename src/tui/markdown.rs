@@ -1,4 +1,4 @@
-use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -22,25 +22,17 @@ pub struct Document {
 #[derive(Debug, Clone)]
 pub enum Block {
     Text(Vec<Line<'static>>),
-    Image(ImageRef),
-    Diagram(DiagramRef),
-}
-
-#[derive(Debug, Clone)]
-pub struct ImageRef {
-    pub alt: String,
-    pub dest: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct DiagramRef {
-    pub language: String,
-    pub source: String,
 }
 
 enum ListKind {
     Bullet,
     Ordered(u64),
+}
+
+/// Related-entry links are metadata: the related pane already shows them, so
+/// their labels should not leak into the rendered content.
+fn is_related_label(label: &str) -> bool {
+    label.trim_start().to_ascii_lowercase().starts_with("more:")
 }
 
 struct Renderer<'a> {
@@ -52,12 +44,10 @@ struct Renderer<'a> {
     pending_prefix: Option<String>,
     item_prefix: Option<String>,
     code_block: bool,
-    diagram_language: Option<String>,
-    diagram_source: String,
     quote_depth: usize,
     lists: Vec<ListKind>,
     image_label: Option<String>,
-    image_dest: Option<String>,
+    link_label: Option<String>,
 }
 
 impl<'a> Renderer<'a> {
@@ -71,12 +61,10 @@ impl<'a> Renderer<'a> {
             pending_prefix: None,
             item_prefix: None,
             code_block: false,
-            diagram_language: None,
-            diagram_source: String::new(),
             quote_depth: 0,
             lists: Vec::new(),
             image_label: None,
-            image_dest: None,
+            link_label: None,
         }
     }
 
@@ -85,9 +73,9 @@ impl<'a> Renderer<'a> {
             Event::Start(tag) => self.start(tag),
             Event::End(tag) => self.end(tag),
             Event::Text(text) => {
-                if self.diagram_language.is_some() {
-                    self.diagram_source.push_str(&text);
-                } else if let Some(label) = self.image_label.as_mut() {
+                if let Some(label) = self.image_label.as_mut() {
+                    label.push_str(&text);
+                } else if let Some(label) = self.link_label.as_mut() {
                     label.push_str(&text);
                 } else if self.code_block {
                     self.code_text(&text);
@@ -97,6 +85,8 @@ impl<'a> Renderer<'a> {
             }
             Event::Code(text) => {
                 if let Some(label) = self.image_label.as_mut() {
+                    label.push_str(&text);
+                } else if let Some(label) = self.link_label.as_mut() {
                     label.push_str(&text);
                 } else {
                     self.inline_code(&text);
@@ -146,33 +136,11 @@ impl<'a> Renderer<'a> {
             Tag::Emphasis => self.push_modifier(Modifier::ITALIC),
             Tag::Strong => self.push_modifier(Modifier::BOLD),
             Tag::Strikethrough => self.push_modifier(Modifier::CROSSED_OUT),
-            Tag::CodeBlock(kind) => {
+            Tag::CodeBlock(_) => {
                 self.finish_line();
                 self.blank();
-
-                let diagram = match kind {
-                    CodeBlockKind::Fenced(info) => {
-                        let language = info
-                            .split_whitespace()
-                            .next()
-                            .unwrap_or_default()
-                            .to_ascii_lowercase();
-
-                        match language.as_str() {
-                            "mermaid" | "mmd" | "dot" | "graphviz" | "typst" => Some(language),
-                            _ => None,
-                        }
-                    }
-                    CodeBlockKind::Indented => None,
-                };
-
-                if let Some(language) = diagram {
-                    self.diagram_language = Some(language);
-                    self.diagram_source.clear();
-                } else {
-                    self.code_block = true;
-                    self.pending_prefix = Some("  ".to_string());
-                }
+                self.code_block = true;
+                self.pending_prefix = Some("  ".to_string());
             }
             Tag::List(start) => {
                 self.finish_line();
@@ -194,12 +162,10 @@ impl<'a> Renderer<'a> {
                     .fg(self.theme.accent)
                     .add_modifier(Modifier::UNDERLINED);
                 self.styles.push(style);
+                self.link_label = Some(String::new());
             }
-            Tag::Image { dest_url, .. } => {
-                self.finish_line();
-                self.flush_text();
+            Tag::Image { .. } => {
                 self.image_label = Some(String::new());
-                self.image_dest = Some(dest_url.to_string());
             }
             Tag::Table(_) => {
                 self.finish_line();
@@ -228,21 +194,19 @@ impl<'a> Renderer<'a> {
                     self.blank();
                 }
             }
-            TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Link => {
-                self.pop_style()
-            }
-            TagEnd::CodeBlock => {
-                if let Some(language) = self.diagram_language.take() {
-                    let source = std::mem::take(&mut self.diagram_source);
-                    self.finish_line();
-                    self.flush_text();
-                    self.blocks.push(Block::Diagram(DiagramRef {
-                        language,
-                        source: source.trim_end().to_string(),
-                    }));
-                    return;
+            TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough => self.pop_style(),
+            TagEnd::Link => {
+                let label = self.link_label.take().unwrap_or_default();
+
+                if !is_related_label(&label) {
+                    self.ensure_prefix();
+                    let style = self.current_style();
+                    self.current.push(Span::styled(label, style));
                 }
 
+                self.pop_style();
+            }
+            TagEnd::CodeBlock => {
                 self.finish_line();
                 self.code_block = false;
                 self.pending_prefix = None;
@@ -266,16 +230,13 @@ impl<'a> Renderer<'a> {
             }
             TagEnd::Image => {
                 let label = self.image_label.take().unwrap_or_default();
-                let dest = self.image_dest.take().unwrap_or_default();
-                let alt = if label.trim().is_empty() {
-                    dest.clone()
-                } else {
-                    label.trim().to_string()
-                };
+                let alt = label.trim();
 
-                self.finish_line();
-                self.flush_text();
-                self.blocks.push(Block::Image(ImageRef { alt, dest }));
+                if alt.is_empty() {
+                    self.text("[image]");
+                } else {
+                    self.text(&format!("[image: {alt}]"));
+                }
             }
             TagEnd::TableRow => self.finish_line(),
             TagEnd::TableHead => {
@@ -476,38 +437,16 @@ mod tests {
         let mut text = String::new();
 
         for block in &document.blocks {
-            if let Block::Text(lines) = block {
-                for line in lines {
-                    for span in &line.spans {
-                        text.push_str(&span.content);
-                    }
+            let Block::Text(lines) = block;
+
+            for line in lines {
+                for span in &line.spans {
+                    text.push_str(&span.content);
                 }
             }
         }
 
         text
-    }
-
-    fn images_of(document: &Document) -> Vec<&ImageRef> {
-        document
-            .blocks
-            .iter()
-            .filter_map(|block| match block {
-                Block::Image(image) => Some(image),
-                Block::Text(_) | Block::Diagram(_) => None,
-            })
-            .collect()
-    }
-
-    fn diagrams_of(document: &Document) -> Vec<&DiagramRef> {
-        document
-            .blocks
-            .iter()
-            .filter_map(|block| match block {
-                Block::Diagram(diagram) => Some(diagram),
-                Block::Text(_) | Block::Image(_) => None,
-            })
-            .collect()
     }
 
     #[test]
@@ -540,33 +479,50 @@ mod tests {
     }
 
     #[test]
-    fn renders_quotes_tables_images_and_rules() {
+    fn renders_quotes_tables_and_rules() {
         let document = render(
-            "> quoted text\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n![alt text](x.png)\n\n---\n",
+            "> quoted text\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n---\n",
             &theme(),
         );
         let text = text_of(&document);
-        let images = images_of(&document);
 
         assert!(text.contains("quoted text"));
         assert!(text.contains("a"));
         assert!(text.contains("b"));
         assert!(text.contains("─"));
-        assert_eq!(images.len(), 1);
-        assert_eq!(images[0].alt, "alt text");
-        assert_eq!(images[0].dest, "x.png");
     }
 
     #[test]
-    fn splits_text_around_image_blocks() {
-        let document = render("Before\n\n![pic](img.png)\n\nAfter\n", &theme());
+    fn hides_related_link_labels_from_content() {
+        let document = render(
+            "See [more:c](../concepts/w/water.md) and [more:term](jff:wt1).\n\nNormal [link](https://example.com).\n",
+            &theme(),
+        );
+        let text = text_of(&document);
 
-        assert_eq!(document.blocks.len(), 3);
-        assert!(matches!(document.blocks[0], Block::Text(_)));
-        assert!(matches!(document.blocks[1], Block::Image(_)));
-        assert!(matches!(document.blocks[2], Block::Text(_)));
-        assert_eq!(text_of(&document).matches("Before").count(), 1);
-        assert_eq!(text_of(&document).matches("After").count(), 1);
+        assert!(!text.contains("more:c"));
+        assert!(!text.contains("more:term"));
+        assert!(text.contains("See"));
+        assert!(text.contains("Normal"));
+        assert!(text.contains("link"));
+    }
+
+    #[test]
+    fn renders_images_as_text_placeholders() {
+        let document = render("Before ![alt text](x.png) after\n", &theme());
+        let text = text_of(&document);
+
+        assert!(text.contains("Before"));
+        assert!(text.contains("[image: alt text]"));
+        assert!(text.contains("after"));
+        assert!(!text.contains("x.png"));
+    }
+
+    #[test]
+    fn renders_plain_image_placeholder_without_alt() {
+        let document = render("![](x.png)\n", &theme());
+
+        assert!(text_of(&document).contains("[image]"));
     }
 
     #[test]
@@ -580,17 +536,15 @@ mod tests {
     }
 
     #[test]
-    fn parses_diagram_code_fences() {
+    fn renders_diagram_code_fences_as_code() {
         let document = render(
             "```mermaid\ngraph TD\nA-->B\n```\n\n```dot\ndigraph { A -> B }\n```\n",
             &theme(),
         );
-        let diagrams = diagrams_of(&document);
+        let text = text_of(&document);
 
-        assert_eq!(diagrams.len(), 2);
-        assert_eq!(diagrams[0].language, "mermaid");
-        assert!(diagrams[0].source.contains("A-->B"));
-        assert_eq!(diagrams[1].language, "dot");
-        assert!(diagrams[1].source.contains("A -> B"));
+        assert!(text.contains("graph TD"));
+        assert!(text.contains("A-->B"));
+        assert!(text.contains("A -> B"));
     }
 }
