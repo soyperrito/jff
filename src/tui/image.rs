@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ratatui_image::picker::Picker;
+use ratatui_image::picker::ProtocolType;
 use ratatui_image::protocol::StatefulProtocol;
 
 use crate::config::Images;
@@ -29,7 +30,18 @@ enum CachedImage {
 
 impl ImageManager {
     pub fn new(config: &Images) -> Self {
-        let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
+        let mut picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
+
+        match config.protocol.to_ascii_lowercase().as_str() {
+            "halfblocks" | "half-blocks" | "blocks" => {
+                picker.set_protocol_type(ProtocolType::Halfblocks);
+            }
+            "kitty" => picker.set_protocol_type(ProtocolType::Kitty),
+            "sixel" => picker.set_protocol_type(ProtocolType::Sixel),
+            "iterm2" | "iterm" => picker.set_protocol_type(ProtocolType::Iterm2),
+            _ => {}
+        }
+
         Self::with_picker(config.clone(), picker)
     }
 

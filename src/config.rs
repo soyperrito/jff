@@ -124,6 +124,9 @@ impl Default for Editor {
 #[serde(default)]
 pub struct Images {
     pub enable: bool,
+    /// `auto`, `halfblocks`, `kitty`, `sixel` or `iterm2`.
+    #[serde(default = "default_image_protocol")]
+    pub protocol: String,
     #[serde(default = "default_image_mime", deserialize_with = "string_or_vec")]
     pub mime: Vec<String>,
     #[serde(default = "default_image_exclude", deserialize_with = "string_or_vec")]
@@ -140,12 +143,17 @@ impl Default for Images {
     fn default() -> Self {
         Self {
             enable: true,
+            protocol: default_image_protocol(),
             mime: default_image_mime(),
             exclude: default_image_exclude(),
             max_size_kb: default_max_image_kb(),
             max_pixels: default_max_image_pixels(),
         }
     }
+}
+
+fn default_image_protocol() -> String {
+    "auto".to_string()
 }
 
 fn default_image_mime() -> Vec<String> {
@@ -339,6 +347,7 @@ mod tests {
         assert_eq!(config.git.token_env, "JFF_GIT_TOKEN");
         assert_eq!(config.images.max_size_kb, 10_240);
         assert_eq!(config.images.max_pixels, 40_000_000);
+        assert_eq!(config.images.protocol, "auto");
         assert_eq!(config.colors.palette.border, "#808080");
         assert_eq!(config.colors.palette.error, "#FF5555");
         assert!(config.images.enable);

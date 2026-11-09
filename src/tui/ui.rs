@@ -7,7 +7,7 @@ use ratatui::widgets::{
     Wrap,
 };
 use ratatui_image::protocol::StatefulProtocol;
-use ratatui_image::{Resize, StatefulImage};
+use ratatui_image::{FilterType, Resize, StatefulImage};
 
 use super::app::{App, Focus};
 use super::markdown::{Block as MdBlock, DiagramRef, ImageRef};
@@ -290,7 +290,7 @@ fn image_block_height(width: u16, max_height: u16, enabled: bool) -> u16 {
     }
 
     let rows = (u32::from(width) / 3)
-        .clamp(6, 16)
+        .clamp(8, 24)
         .min(u32::from(max_height.saturating_sub(1))) as u16;
     rows + 1
 }
@@ -351,7 +351,7 @@ fn draw_image(frame: &mut Frame, app: &mut App, image: &ImageRef, area: Rect, fu
                     ..area
                 };
                 let widget: StatefulImage<StatefulProtocol> =
-                    StatefulImage::new().resize(Resize::Scale(None));
+                    StatefulImage::new().resize(Resize::Scale(Some(FilterType::Lanczos3)));
                 frame.render_stateful_widget(widget, image_area, protocol);
             }
 

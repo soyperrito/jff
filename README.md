@@ -208,6 +208,21 @@ Local images must stay inside `~/.jff`. `http://` and `https://` images are
 downloaded once and cached under `~/.jff/.cache/images/`. Supported types and
 size limits are configured in `config.json`.
 
+For sharper images use a terminal with Kitty, Sixel or iTerm2 support. The
+protocol is auto-detected; it can be forced with `images.protocol`:
+
+```json
+{
+  "images": {
+    "protocol": "kitty"
+  }
+}
+```
+
+Values: `auto`, `halfblocks`, `kitty`, `sixel`, `iterm2`. The half-blocks
+fallback is intentionally low-resolution; choosing a graphics-capable terminal
+is the only way to get full image quality.
+
 Math:
 
 ```markdown
@@ -239,6 +254,7 @@ effective configuration. A minimal example:
   },
   "images": {
     "enable": true,
+    "protocol": "auto",
     "mime": ["jpg", "jpeg", "png"],
     "exclude": ["gif", "webp"],
     "max_size_kb": 10240,

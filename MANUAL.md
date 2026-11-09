@@ -522,6 +522,7 @@ jff config show       # imprime la configuración efectiva, con tema aplicado
   },
   "images": {
     "enable": true,
+    "protocol": "auto",
     "mime": ["jpg", "jpeg", "png"],
     "exclude": ["gif", "webp"],
     "max_size_kb": 10240,
@@ -770,6 +771,12 @@ Reglas:
 - Las URLs `http://` y `https://` se descargan una vez y se guardan en
   `~/.jff/.cache/images/`.
 - Se aceptan rutas absolutas dentro del store.
+- Usa un terminal con Kitty, Sixel o iTerm2 para máxima nitidez. El protocolo
+  se detecta automáticamente y se puede forzar:
+  ```json
+  { "images": { "protocol": "kitty" } }
+  ```
+  Valores: `auto`, `halfblocks`, `kitty`, `sixel`, `iterm2`.
 - Los tipos permitidos y excluidos se configuran en `images.mime` y
   `images.exclude`.
 - Límites:
