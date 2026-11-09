@@ -80,6 +80,7 @@ jff delete <REF>
 jff edit <REF> [--editor nano|vim|code|emacs|custom]
 jff backup                        Commit and push the knowledge base
 jff load                          Load map.json, terms/ and concepts/ from the remote
+jff index                         Register manual files under terms/ and concepts/
 jff completions bash|zsh|fish|powershell|elvish
 jff man
 jff config path|init|show
@@ -125,6 +126,19 @@ A ref has the form `[letter][type][YYYYMMDDHHMMSS]`, for example
 - the destination folder is chosen from the first letter of the title;
 - duplicate titles of the same type are rejected.
 
+If you edit or add Markdown files directly under `~/.jff/terms/` or
+`~/.jff/concepts/`, register them with:
+
+```sh
+jff index
+```
+
+`jff index` scans both trees, registers unindexed `.md`/`.markdown` files **in
+place** (without moving them), skips files already present in `map.json`, and
+reports duplicate titles. It uses the same title rules: front matter `title:`,
+first `# H1`, then file name. If `git.autopush` is enabled, the new entries are
+backed up afterwards.
+
 ## Terminal UI
 
 Keys:
@@ -156,10 +170,12 @@ In any Markdown file:
 [more:term](jff:wt20261109123456)
 [more:t](wt20261109123456)
 [more:c](wc20261109123456)
+[more:c](/concepts/w/water_pollution.md)
 ```
 
-The related pane shows the first `# H1` of each target file. Unresolved links are
-shown as `[missing]`.
+Relative paths and leading-slash store paths such as `/concepts/...` are
+accepted. The related pane shows the first `# H1` of each target file.
+Unresolved links are shown as `[missing]`.
 
 ## Search and listing
 
@@ -184,10 +200,12 @@ Images:
 
 ```markdown
 ![Description](../../images/picture.png)
+![Description](https://example.com/picture.jpg)
 ```
 
-Images must stay inside `~/.jff`; supported types and size limits are configured
-in `config.json`.
+Local images must stay inside `~/.jff`. `http://` and `https://` images are
+downloaded once and cached under `~/.jff/.cache/images/`. Supported types and
+size limits are configured in `config.json`.
 
 Math:
 

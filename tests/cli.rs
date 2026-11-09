@@ -441,6 +441,31 @@ fn generates_a_man_page() {
 }
 
 #[test]
+fn index_registers_manual_files() {
+    let home = TempDir::new().expect("temp dir");
+    let term = home.path().join("terms/m/manual_note.md");
+    let concept = home.path().join("concepts/m/manual_concept.md");
+
+    fs::create_dir_all(term.parent().expect("term dir")).expect("term dir");
+    fs::create_dir_all(concept.parent().expect("concept dir")).expect("concept dir");
+    fs::write(&term, "# Manual Note\n\nBody.\n").expect("term");
+    fs::write(&concept, "# Manual Concept\n\nBody.\n").expect("concept");
+
+    let stdout = ok(home.path(), &["index"]);
+    assert!(stdout.contains("scanned 2 file(s), indexed 2, skipped 0"));
+
+    let registry = map(home.path());
+    assert_eq!(registry["entries"].as_array().unwrap().len(), 2);
+    assert!(term.is_file());
+    assert!(concept.is_file());
+
+    let second = ok(home.path(), &["index"]);
+    assert!(second.contains("indexed 0"));
+
+    assert_eq!(map(home.path())["entries"].as_array().unwrap().len(), 2);
+}
+
+#[test]
 fn autopush_commits_to_a_local_remote() {
     let home = TempDir::new().expect("temp dir");
     let remote = home.path().join("remote.git");

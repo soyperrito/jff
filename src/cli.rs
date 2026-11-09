@@ -125,6 +125,9 @@ pub enum Command {
     /// Load map.json, terms/ and concepts/ from the configured remote
     Load,
 
+    /// Register Markdown files already present under terms/ and concepts/
+    Index,
+
     /// Generate shell completions
     Completions {
         #[arg(value_enum, value_name = "SHELL")]

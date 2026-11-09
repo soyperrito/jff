@@ -210,6 +210,42 @@ jff create -c ./inbox/climate_change.md
   `create` devuelve error si ya existe.
 - El destino se calcula con slug ASCII, en minúsculas y sin acentos.
 
+### 3.6 Indexar archivos manuales
+
+Si editas o creas archivos directamente bajo `~/.jff/terms/` o
+`~/.jff/concepts/`, regístralos con:
+
+```sh
+jff index
+```
+
+Comportamiento:
+
+- Recorre recursivamente `terms/` y `concepts/`.
+- Reconoce archivos `.md` y `.markdown`.
+- Obtiene el título de `title:` en front matter, el primer `# H1` o el nombre
+  del archivo.
+- Registra el archivo **en su ruta actual**, sin moverlo ni copiarlo.
+- Omite silenciosamente archivos que ya están en `map.json`.
+- Omite y reporta archivos con título duplicado del mismo tipo.
+- Crea la entrada en `map.json` y ejecuta `jff backup` si `autopush` está
+  activo.
+
+Ejemplo:
+
+```text
+~/.jff/terms/w/manual_note.md    # contenido: # Manual Note
+~/.jff/concepts/w/manual.md      # contenido: # Manual Concept
+
+$ jff index
+scanned 2 file(s), indexed 2, skipped 0
+  + term "Manual Note" mt... -> terms/w/manual_note.md
+  + concept "Manual Concept" mc... -> concepts/w/manual.md
+```
+
+La letra del registro se calcula desde el título; la ruta se conserva tal como
+está en disco.
+
 ---
 
 ## 4. Abrir entradas en la TUI
@@ -366,11 +402,14 @@ También existen los alias cortos:
 [more:c](../../concepts/w/water_pollution.md)
 [more:t](jff:wt20261109123456)
 [more:c](wc20261109123456)
+[more:c](/concepts/w/water_pollution.md)
 ```
 
 Reglas:
 
 - Las rutas relativas se resuelven desde el archivo Markdown actual.
+- Las rutas con `/` inicial se interpretan relativas al store:
+  `/concepts/w/water_pollution.md`.
 - La ruta debe quedar dentro de `~/.jff`.
 - Se acepta una ref como destino.
 - El panel de relacionados muestra el **primer H1** del archivo destino, no el
@@ -721,12 +760,15 @@ Sintaxis Markdown:
 
 ```markdown
 ![Descripción](../../images/pic.png)
+![Descripción](https://example.com/pic.jpg)
 ```
 
 Reglas:
 
-- La ruta es relativa al Markdown que contiene la imagen.
-- Debe estar dentro de `~/.jff`.
+- Las rutas locales son relativas al Markdown que contiene la imagen.
+- Las rutas locales deben estar dentro de `~/.jff`.
+- Las URLs `http://` y `https://` se descargan una vez y se guardan en
+  `~/.jff/.cache/images/`.
 - Se aceptan rutas absolutas dentro del store.
 - Los tipos permitidos y excluidos se configuran en `images.mime` y
   `images.exclude`.

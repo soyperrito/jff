@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
@@ -17,6 +18,19 @@ pub struct Related {
     pub target: Option<Entry>,
     /// First `# heading` of the target file, used by the related option list.
     pub heading: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct IndexReport {
+    pub scanned: usize,
+    pub added: Vec<Entry>,
+    pub skipped: Vec<IndexSkip>,
+}
+
+#[derive(Debug)]
+pub struct IndexSkip {
+    pub path: String,
+    pub reason: String,
 }
 
 #[derive(Clone)]
@@ -76,6 +90,126 @@ impl Store {
         } else {
             self.insert(kind, &stem, None, NewContent::Generated)
         }
+    }
+
+    /// Register Markdown files that already exist under `terms/` and
+    /// `concepts/` without moving or copying them.
+    ///
+    /// Files already present in the registry are skipped silently. Files with
+    /// unreadable content or a title that already exists for the same kind are
+    /// reported in `IndexReport::skipped`.
+    pub fn index(&self) -> Result<IndexReport> {
+        self.ensure_layout()?;
+        let _lock = self.lock()?;
+        let mut registry = self.load()?;
+        let mut report = IndexReport::default();
+        let mut files = Vec::new();
+
+        collect_markdown(&self.root.join(Kind::Term.dir()), Kind::Term, &mut files)?;
+        collect_markdown(
+            &self.root.join(Kind::Concept.dir()),
+            Kind::Concept,
+            &mut files,
+        )?;
+        files.sort_by(|left, right| left.1.cmp(&right.1));
+
+        let mut registered_paths: HashSet<String> = registry
+            .entries
+            .iter()
+            .map(|entry| path_key(Path::new(&entry.path)))
+            .collect();
+        let mut registered_titles: HashSet<(char, String)> = registry
+            .entries
+            .iter()
+            .map(|entry| (entry.kind.as_char(), text::normalize(&entry.title)))
+            .collect();
+
+        for (kind, absolute_path) in files {
+            report.scanned += 1;
+            let relative = relative_path(&self.root, &absolute_path)?;
+
+            if registered_paths.contains(&relative) {
+                continue;
+            }
+
+            let contents = match fs::read_to_string(&absolute_path) {
+                Ok(contents) => contents,
+                Err(error) => {
+                    report.skipped.push(IndexSkip {
+                        path: relative,
+                        reason: format!("cannot read file: {error}"),
+                    });
+                    continue;
+                }
+            };
+
+            let fallback = absolute_path
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .and_then(text::title_from_stem);
+            let title = text::title_from_markdown(&contents)
+                .or(fallback)
+                .unwrap_or_else(|| "untitled".to_string());
+            let title = match validate_title(&title) {
+                Ok(title) => title.to_string(),
+                Err(error) => {
+                    report.skipped.push(IndexSkip {
+                        path: relative,
+                        reason: error.to_string(),
+                    });
+                    continue;
+                }
+            };
+
+            let title_key = (kind.as_char(), text::normalize(&title));
+
+            if registered_titles.contains(&title_key) {
+                report.skipped.push(IndexSkip {
+                    path: relative,
+                    reason: format!("a {kind} titled `{title}` already exists"),
+                });
+                continue;
+            }
+
+            let letter = refs::first_letter(&title);
+            let mut stamp = refs::timestamp_now();
+            let reference = loop {
+                let candidate = refs::make(kind, &title, &stamp);
+
+                if !registry
+                    .entries
+                    .iter()
+                    .any(|entry| entry.reference.eq_ignore_ascii_case(&candidate))
+                {
+                    break candidate;
+                }
+
+                stamp = refs::bump_stamp(&stamp);
+            };
+
+            let created_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let entry = Entry {
+                id: registry.next_id,
+                reference: reference.clone(),
+                kind,
+                title: title.clone(),
+                letter,
+                path: relative.clone(),
+                created_at,
+            };
+
+            registry.next_id = registry.next_id.saturating_add(1);
+            registry.entries.push(entry.clone());
+            registered_paths.insert(relative);
+            registered_titles.insert(title_key);
+            report.added.push(entry);
+        }
+
+        if !report.added.is_empty() {
+            self.save(&registry)?;
+        }
+
+        Ok(report)
     }
 
     fn insert(
@@ -420,6 +554,46 @@ enum NewContent {
     Custom(String),
 }
 
+fn collect_markdown(directory: &Path, kind: Kind, files: &mut Vec<(Kind, PathBuf)>) -> Result<()> {
+    let entries = match fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+
+    for entry in entries {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+
+        if file_type.is_dir() {
+            collect_markdown(&entry.path(), kind, files)?;
+        } else if file_type.is_file() && is_markdown(&entry.path()) {
+            files.push((kind, entry.path()));
+        }
+    }
+
+    Ok(())
+}
+
+fn is_markdown(path: &Path) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("md") || extension.eq_ignore_ascii_case("markdown")
+        })
+}
+
+fn relative_path(root: &Path, path: &Path) -> Result<String> {
+    let relative = path.strip_prefix(root).map_err(|_| {
+        Error::InvalidTitle(format!(
+            "`{}` is outside the knowledge base",
+            path.display()
+        ))
+    })?;
+
+    Ok(path_key(relative))
+}
+
 fn validate_title(title: &str) -> Result<&str> {
     let title = title.trim();
 
@@ -709,5 +883,58 @@ mod tests {
             .expect_err("duplicate import");
 
         assert!(matches!(error, Error::Duplicate(..)));
+    }
+
+    #[test]
+    fn indexes_manual_files_without_moving_them() {
+        let (_directory, store) = store();
+        let term_path = store.root().join("terms/w/manual_note.md");
+        let concept_path = store.root().join("concepts/w/manual_concept.md");
+
+        fs::create_dir_all(term_path.parent().unwrap()).expect("term dir");
+        fs::create_dir_all(concept_path.parent().unwrap()).expect("concept dir");
+        fs::write(&term_path, "# Manual Note\n\nBody.\n").expect("term");
+        fs::write(&concept_path, "# Manual Concept\n\nBody.\n").expect("concept");
+
+        let report = store.index().expect("index");
+
+        assert_eq!(report.scanned, 2);
+        assert_eq!(report.added.len(), 2);
+        assert!(report.skipped.is_empty());
+        assert!(term_path.is_file());
+        assert!(concept_path.is_file());
+
+        let registry = store.load().expect("registry");
+        let term = registry
+            .entries
+            .iter()
+            .find(|entry| entry.kind == Kind::Term)
+            .expect("term entry");
+        assert_eq!(term.title, "Manual Note");
+        assert_eq!(term.path, "terms/w/manual_note.md");
+        assert_eq!(term.letter, 'm');
+
+        let second = store.index().expect("second index");
+        assert_eq!(second.scanned, 2);
+        assert!(second.added.is_empty());
+        assert!(second.skipped.is_empty());
+    }
+
+    #[test]
+    fn index_skips_duplicate_titles() {
+        let (_directory, store) = store();
+        let first = store.root().join("terms/a/same.md");
+        let second = store.root().join("terms/b/same.md");
+
+        fs::create_dir_all(first.parent().unwrap()).expect("first dir");
+        fs::create_dir_all(second.parent().unwrap()).expect("second dir");
+        fs::write(&first, "# Same Title\n").expect("first");
+        fs::write(&second, "# Same Title\n").expect("second");
+
+        let report = store.index().expect("index");
+
+        assert_eq!(report.added.len(), 1);
+        assert_eq!(report.skipped.len(), 1);
+        assert!(report.skipped[0].reason.contains("already exists"));
     }
 }

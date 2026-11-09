@@ -1,6 +1,9 @@
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use ratatui_image::picker::Picker;
 use ratatui_image::protocol::StatefulProtocol;
@@ -10,9 +13,11 @@ use crate::links;
 
 const MAX_DIMENSION: u32 = 16_384;
 const MAX_DECODE_ALLOC: u64 = 256 * 1024 * 1024;
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct ImageManager {
     picker: Picker,
+    agent: ureq::Agent,
     config: Images,
     cache: HashMap<PathBuf, CachedImage>,
 }
@@ -29,8 +34,15 @@ impl ImageManager {
     }
 
     fn with_picker(config: Images, picker: Picker) -> Self {
+        let agent = ureq::Agent::new_with_config(
+            ureq::Agent::config_builder()
+                .timeout_global(Some(DOWNLOAD_TIMEOUT))
+                .build(),
+        );
+
         Self {
             picker,
+            agent,
             config,
             cache: HashMap::new(),
         }
@@ -38,17 +50,75 @@ impl ImageManager {
 
     /// Resolve an image destination relative to the note, enforce the configured
     /// type and size limits, and return an absolute path inside the store.
+    /// `http://` and `https://` destinations are downloaded once into
+    /// `.cache/images/`.
     pub fn resolve(&self, root: &Path, base_dir: &Path, dest: &str) -> Result<PathBuf, String> {
         if !self.config.enable {
             return Err("images are disabled in config".to_string());
+        }
+
+        if dest.starts_with("http://") || dest.starts_with("https://") {
+            return self.resolve_remote(root, dest);
         }
 
         let dest = dest.strip_prefix("file://").unwrap_or(dest);
         let path = links::resolve_path(root, base_dir, dest)
             .ok_or_else(|| "image path is outside the knowledge base or is a URL".to_string())?;
 
-        let path = root.join(path);
+        self.validate_image(&root.join(path))
+    }
 
+    fn resolve_remote(&self, root: &Path, url: &str) -> Result<PathBuf, String> {
+        let directory = root.join(".cache").join("images");
+        fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+
+        let mut hasher = DefaultHasher::new();
+        url.hash(&mut hasher);
+        let stem = format!("{:016x}", hasher.finish());
+
+        for extension in ["png", "jpg", "jpeg", "gif", "webp"] {
+            let cached = directory.join(format!("{stem}.{extension}"));
+
+            if cached.is_file() {
+                return self.validate_image(&cached);
+            }
+        }
+
+        let mut response = self
+            .agent
+            .get(url)
+            .header("User-Agent", concat!("jff/", env!("CARGO_PKG_VERSION")))
+            .call()
+            .map_err(|error| format!("cannot download image: {error}"))?;
+        let bytes = response
+            .body_mut()
+            .read_to_vec()
+            .map_err(|error| format!("cannot read image response: {error}"))?;
+
+        self.validate_size(bytes.len() as u64)?;
+
+        let format = image::guess_format(&bytes)
+            .map_err(|error| format!("unsupported image format: {error}"))?;
+        let extension = format
+            .extensions_str()
+            .first()
+            .copied()
+            .unwrap_or("img")
+            .to_ascii_lowercase();
+        self.validate_extension(&extension)?;
+
+        let path = directory.join(format!("{stem}.{extension}"));
+        fs::write(&path, &bytes).map_err(|error| error.to_string())?;
+
+        if let Err(error) = self.validate_image(&path) {
+            let _ = fs::remove_file(&path);
+            return Err(error);
+        }
+
+        Ok(path)
+    }
+
+    fn validate_image(&self, path: &Path) -> Result<PathBuf, String> {
         if !path.is_file() {
             return Err(format!("image file not found: {}", path.display()));
         }
@@ -58,31 +128,12 @@ impl ImageManager {
             .and_then(|value| value.to_str())
             .unwrap_or_default()
             .to_ascii_lowercase();
+        self.validate_extension(&extension)?;
 
-        if list_contains(&self.config.exclude, &extension) {
-            return Err(format!("image type `{extension}` is excluded"));
-        }
+        let metadata = fs::metadata(path).map_err(|error| error.to_string())?;
+        self.validate_size(metadata.len())?;
 
-        if !self.config.mime.is_empty() && !list_contains(&self.config.mime, &extension) {
-            return Err(format!(
-                "image type `{extension}` is not in the allowed MIME list"
-            ));
-        }
-
-        let metadata = fs::metadata(&path).map_err(|error| error.to_string())?;
-
-        if self.config.max_size_kb > 0 {
-            let limit = self.config.max_size_kb.saturating_mul(1024);
-
-            if metadata.len() > limit {
-                return Err(format!(
-                    "image is too large ({} bytes, limit {limit} bytes)",
-                    metadata.len()
-                ));
-            }
-        }
-
-        let (width, height) = image::image_dimensions(&path).map_err(|error| error.to_string())?;
+        let (width, height) = image::image_dimensions(path).map_err(|error| error.to_string())?;
         let pixels = u64::from(width) * u64::from(height);
 
         if self.config.max_pixels > 0 && pixels > self.config.max_pixels {
@@ -92,7 +143,35 @@ impl ImageManager {
             ));
         }
 
-        Ok(path)
+        Ok(path.to_path_buf())
+    }
+
+    fn validate_extension(&self, extension: &str) -> Result<(), String> {
+        if list_contains(&self.config.exclude, extension) {
+            return Err(format!("image type `{extension}` is excluded"));
+        }
+
+        if !self.config.mime.is_empty() && !list_contains(&self.config.mime, extension) {
+            return Err(format!(
+                "image type `{extension}` is not in the allowed MIME list"
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn validate_size(&self, size: u64) -> Result<(), String> {
+        if self.config.max_size_kb > 0 {
+            let limit = self.config.max_size_kb.saturating_mul(1024);
+
+            if size > limit {
+                return Err(format!(
+                    "image is too large ({size} bytes, limit {limit} bytes)"
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     pub fn protocol(&mut self, path: &Path) -> Result<&mut StatefulProtocol, String> {
@@ -156,16 +235,22 @@ fn list_contains(list: &[String], extension: &str) -> bool {
 mod tests {
     use super::*;
     use image::{DynamicImage, ImageFormat, Rgba, RgbaImage};
-    use std::io::Cursor;
+    use std::io::{Cursor, Read, Write};
+    use std::net::TcpListener;
+    use std::time::Instant;
     use tempfile::TempDir;
 
-    fn write_png(path: &Path, width: u32, height: u32) {
+    fn png_bytes(width: u32, height: u32) -> Vec<u8> {
         let image = RgbaImage::from_pixel(width, height, Rgba([255, 0, 0, 255]));
         let mut bytes = Vec::new();
         DynamicImage::ImageRgba8(image)
             .write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png)
             .expect("encode png");
-        fs::write(path, bytes).expect("write png");
+        bytes
+    }
+
+    fn write_png(path: &Path, width: u32, height: u32) {
+        fs::write(path, png_bytes(width, height)).expect("write png");
     }
 
     #[test]
@@ -231,6 +316,58 @@ mod tests {
             .expect_err("pixel limit exceeded");
 
         assert!(error.contains("too many pixels"));
+    }
+
+    #[test]
+    fn downloads_remote_images_to_the_cache() {
+        let directory = TempDir::new().expect("temp dir");
+        let root = directory.path();
+        let bytes = png_bytes(2, 2);
+        let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
+        listener.set_nonblocking(true).expect("nonblocking");
+        let address = listener.local_addr().expect("address");
+
+        let server = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(10);
+
+            loop {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        let mut request = [0u8; 4096];
+                        let _ = stream.read(&mut request);
+                        let header = format!(
+                            "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                            bytes.len()
+                        );
+                        let _ = stream.write_all(header.as_bytes());
+                        let _ = stream.write_all(&bytes);
+                        break;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        if Instant::now() >= deadline {
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+
+        let manager = ImageManager::halfblocks(&Images::default());
+        let url = format!("http://{address}/picture.png");
+        let path = manager
+            .resolve(root, root, &url)
+            .expect("download remote image");
+
+        server.join().expect("server");
+        assert!(path.is_file());
+        assert!(path.starts_with(root.join(".cache/images")));
+
+        let cached = manager
+            .resolve(root, root, &url)
+            .expect("use cached remote image");
+        assert_eq!(path, cached);
     }
 
     #[test]

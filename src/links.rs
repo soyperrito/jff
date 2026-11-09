@@ -56,9 +56,11 @@ fn kind_from_label(label: &str) -> Option<Kind> {
 
 /// Resolve a link destination to a path relative to `root`.
 ///
-/// Absolute destinations must live under `root`. Relative destinations are
-/// resolved from `base_dir`. `..` components that escape `root`, URLs and
-/// empty destinations are rejected.
+/// Relative destinations are resolved from `base_dir`. A leading `/` is first
+/// treated as an absolute path under `root`; if that does not match, it is
+/// treated as a store-relative path (`/concepts/foo.md` -> `concepts/foo.md`),
+/// matching the notation used by the original specification. `..` components
+/// that escape `root`, URLs and empty destinations are rejected.
 pub fn resolve_path(root: &Path, base_dir: &Path, dest: &str) -> Option<PathBuf> {
     let dest = dest.split(['#', '?']).next().unwrap_or(dest).trim();
 
@@ -68,7 +70,11 @@ pub fn resolve_path(root: &Path, base_dir: &Path, dest: &str) -> Option<PathBuf>
 
     let path = Path::new(dest);
     let joined = if path.is_absolute() {
-        path.to_path_buf()
+        if path.starts_with(root) {
+            path.to_path_buf()
+        } else {
+            root.join(path.strip_prefix("/").unwrap_or(path))
+        }
     } else {
         base_dir.join(path)
     };
@@ -140,6 +146,10 @@ Short [more:t](jff:wt20261109123456) and [more:c](wc20261109123456).
             resolve_path(root, base, "/home/u/.jff/concepts/w/water.md#top"),
             Some(PathBuf::from("concepts/w/water.md"))
         );
+        assert_eq!(
+            resolve_path(root, base, "/concepts/w/water.md"),
+            Some(PathBuf::from("concepts/w/water.md"))
+        );
     }
 
     #[test]
@@ -149,7 +159,10 @@ Short [more:t](jff:wt20261109123456) and [more:c](wc20261109123456).
 
         assert_eq!(resolve_path(root, base, "../../../etc/passwd"), None);
         assert_eq!(resolve_path(root, base, "https://example.com"), None);
-        assert_eq!(resolve_path(root, base, "/etc/passwd"), None);
         assert_eq!(resolve_path(root, base, ""), None);
+        assert_eq!(
+            resolve_path(root, base, "/etc/passwd"),
+            Some(PathBuf::from("etc/passwd"))
+        );
     }
 }

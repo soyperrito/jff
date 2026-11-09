@@ -27,6 +27,7 @@ tempfile = "3"
 thiserror = "2"
 unicode-normalization = "0.1"
 unicodeit = "0.2"
+ureq = "3.5"
 
 [dev-dependencies]
 assert_cmd = "2"

@@ -128,6 +128,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
         }
         Some(CliCommand::Backup) => backup_command(&store, &config),
         Some(CliCommand::Load) => load_command(&store, &config),
+        Some(CliCommand::Index) => index_command(&store, &config),
         Some(CliCommand::Completions { .. }) | Some(CliCommand::Man) => {
             unreachable!("packaging commands are handled before loading the configuration")
         }
@@ -370,6 +371,34 @@ fn load_command(store: &Store, config: &config::Config) -> Result<ExitCode> {
 
     if let Some(backup) = backup {
         println!("previous data backed up to {}", backup.display());
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn index_command(store: &Store, config: &config::Config) -> Result<ExitCode> {
+    let report = store.index()?;
+
+    println!(
+        "scanned {} file(s), indexed {}, skipped {}",
+        report.scanned,
+        report.added.len(),
+        report.skipped.len()
+    );
+
+    for entry in &report.added {
+        println!(
+            "  + {} \"{}\" {} -> {}",
+            entry.kind, entry.title, entry.reference, entry.path
+        );
+    }
+
+    for skip in &report.skipped {
+        eprintln!("  ! {}: {}", skip.path, skip.reason);
+    }
+
+    if !report.added.is_empty() {
+        autopush_or_warn(store.root(), config, "index");
     }
 
     Ok(ExitCode::SUCCESS)
