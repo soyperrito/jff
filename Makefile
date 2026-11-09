@@ -7,8 +7,9 @@ FISHCOMPDIR ?= $(PREFIX)/share/fish/vendor_completions.d
 
 CARGO ?= cargo
 BIN := target/release/jff
+NFPM_BIN ?= nfpm
 
-.PHONY: all build release test fmt clippy completions man install uninstall clean
+.PHONY: all build release test fmt clippy completions man packages install uninstall clean
 
 all: build
 
@@ -35,6 +36,9 @@ completions: build
 man: build
 	mkdir -p man
 	$(BIN) man > man/jff.1
+
+packages:
+	NFPM_BIN=$(NFPM_BIN) scripts/build-packages.sh
 
 install: build
 	mkdir -p man completions

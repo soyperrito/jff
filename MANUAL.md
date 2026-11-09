@@ -1322,6 +1322,7 @@ make fmt
 make clippy
 make completions  # genera completions/
 make man          # genera man/jff.1
+make packages     # genera .deb y .rpm (requiere nfpm)
 make install      # binario + man + completions
 make uninstall
 make clean
@@ -1362,6 +1363,37 @@ Cada archivo incluye:
 - completions de bash, zsh y fish
 - `man/jff.1`
 - directorio `themes/` con los temas incluidos
+
+Además se generan paquetes nativos:
+
+- `dist/jff_<version>-1_amd64.deb`
+- `dist/jff-<version>-1.x86_64.rpm`
+
+### 19.6 Paquetes .deb y .rpm
+
+```sh
+make packages
+# o
+NFPM_BIN=nfpm scripts/build-packages.sh
+```
+
+Los paquetes:
+
+- instalan `jff` en `/usr/local/bin/jff`;
+- instalan los temas en `/usr/local/share/jff/themes/`;
+- instalan `config.default.json`, man page y completions;
+- declaran dependencias: `git`, `nano`, `ca-certificates`, `libc` y `libgcc`;
+- recomiendan `graphviz` y sugieren `typst`/`mermaid-cli`;
+- ejecutan un `postinstall` que crea `~/.jff/config.json` y copia los temas
+  para los usuarios existentes y `/etc/skel`, sin sobrescribir archivos del
+  usuario.
+
+Si no tienes `nfpm`:
+
+```sh
+curl -fsSL https://github.com/goreleaser/nfpm/releases/download/v2.48.0/nfpm_2.48.0_Linux_x86_64.tar.gz |
+  sudo tar -xz -C /usr/local/bin nfpm
+```
 
 Ejemplo:
 

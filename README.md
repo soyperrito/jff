@@ -18,6 +18,7 @@ Full command reference, themes, images and pipe examples:
 - Rust 1.89 or newer (edition 2024)
 - `git` for synchronization (optional)
 - `mmdc`, `dot` or `typst` for diagram rendering (optional)
+- `nfpm` for building `.deb`/`.rpm` packages (optional)
 
 ## Build and install
 
@@ -499,6 +500,20 @@ inline with the image support. Otherwise the diagram source is shown with the
 - `make install` installs the binary, man page and bash/zsh/fish completions.
 - `make completions man` generates the artifacts under `completions/` and
   `man/`.
+- `make packages` builds `.deb` and `.rpm` packages with [nfpm](https://nfpm.goreleaser.com/):
+  - `dist/jff_<version>-1_amd64.deb`
+  - `dist/jff-<version>-1.x86_64.rpm`
+
+The native packages:
+
+- install `jff` to `/usr/local/bin/jff`;
+- install themes to `/usr/local/share/jff/themes/`;
+- install a default config template and man page/completions;
+- declare `git`, `nano`, `ca-certificates`, `libc` and `libgcc` as runtime
+  dependencies;
+- recommend `graphviz` and suggest `typst`/`mermaid-cli`;
+- initialize `~/.jff/config.json` and copy themes for existing users and
+  `/etc/skel` from the `postinstall` script, without overwriting user files.
 
 CI lives in `.github/workflows/ci.yml` and runs format, Clippy, tests, release
 build and packaging smoke tests.
@@ -506,7 +521,8 @@ build and packaging smoke tests.
 Pushing a tag such as `v0.1.0` triggers `.github/workflows/release.yml`, which
 builds Linux x86_64, macOS ARM64 and Windows x86_64 archives. Each archive
 contains the binary, `README.md`, `MANUAL.md`, `LICENSE`, `NOTICE`,
-completions, the man page and the sample `themes/` directory.
+completions, the man page and the sample `themes/` directory. The workflow also
+builds the Linux `.deb` and `.rpm` packages.
 
 ## Development
 

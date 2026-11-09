@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=https://nfpm.goreleaser.com/schema.json
+name: jff
+arch: amd64
+platform: linux
+version: ${VERSION}
+release: "1"
+section: utils
+priority: optional
+maintainer: Rodrigo Quintanar <djperseo@outlook.es>
+description: |
+  Just for Fun - Encyclopedic Dictionary
+  Local Markdown knowledge base with a terminal UI, images,
+  math, diagrams and Git backup/load.
+vendor: Rodrigo Quintanar
+homepage: https://github.com/soyperrito/jff
+license: GPL-3.0-only
+
+# Runtime dependencies are supplied by the distribution. The two C libraries
+# come from the Rust dynamic dependencies (libc and libgcc_s).
+depends:
+  - git
+  - nano
+  - ca-certificates
+
+recommends:
+  - graphviz
+
+suggests:
+  - typst
+  - mermaid-cli
+
+contents:
+  - src: packaging/build/jff
+    dst: /usr/local/bin/jff
+    file_info:
+      mode: 0755
+
+  - src: packaging/build/config.default.json
+    dst: /usr/local/share/jff/config.default.json
+    file_info:
+      mode: 0644
+
+  - src: packaging/build/themes/
+    dst: /usr/local/share/jff/themes
+    type: tree
+
+  - src: packaging/build/jff.1
+    dst: /usr/local/share/man/man1/jff.1
+    file_info:
+      mode: 0644
+
+  - src: packaging/build/completions/jff.bash
+    dst: /usr/local/share/bash-completion/completions/jff
+    file_info:
+      mode: 0644
+
+  - src: packaging/build/completions/_jff
+    dst: /usr/local/share/zsh/site-functions/_jff
+    file_info:
+      mode: 0644
+
+  - src: packaging/build/completions/jff.fish
+    dst: /usr/local/share/fish/vendor_completions.d/jff.fish
+    file_info:
+      mode: 0644
+
+scripts:
+  postinstall: packaging/scripts/postinstall.sh
+
+overrides:
+  deb:
+    depends:
+      - libc6 (>= 2.39)
+      - libgcc-s1
+      - git
+      - nano
+      - ca-certificates
+    recommends:
+      - graphviz
+
+  rpm:
+    depends:
+      - glibc >= 2.39
+      - libgcc
+      - git
+      - nano
+      - ca-certificates
+    recommends:
+      - graphviz
