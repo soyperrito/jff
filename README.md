@@ -203,8 +203,7 @@ $E=mc^2$
 
 Inline and display math are converted to Unicode where possible.
 
-Images are not rendered. Markdown image syntax is shown as a text placeholder
-such as `[image: description]`.
+Images are not supported: Markdown image syntax is ignored.
 
 ## Configuration
 

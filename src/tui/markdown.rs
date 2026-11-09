@@ -229,14 +229,9 @@ impl<'a> Renderer<'a> {
                 self.blank();
             }
             TagEnd::Image => {
-                let label = self.image_label.take().unwrap_or_default();
-                let alt = label.trim();
-
-                if alt.is_empty() {
-                    self.text("[image]");
-                } else {
-                    self.text(&format!("[image: {alt}]"));
-                }
+                // Image support was removed. Discard the alt text so no
+                // placeholder leaks into the rendered content.
+                self.image_label = None;
             }
             TagEnd::TableRow => self.finish_line(),
             TagEnd::TableHead => {
@@ -508,21 +503,22 @@ mod tests {
     }
 
     #[test]
-    fn renders_images_as_text_placeholders() {
+    fn omits_image_syntax_from_content() {
         let document = render("Before ![alt text](x.png) after\n", &theme());
         let text = text_of(&document);
 
         assert!(text.contains("Before"));
-        assert!(text.contains("[image: alt text]"));
         assert!(text.contains("after"));
+        assert!(!text.contains("alt text"));
         assert!(!text.contains("x.png"));
+        assert!(!text.contains("[image"));
     }
 
     #[test]
-    fn renders_plain_image_placeholder_without_alt() {
+    fn omits_images_without_alt_from_content() {
         let document = render("![](x.png)\n", &theme());
 
-        assert!(text_of(&document).contains("[image]"));
+        assert!(!text_of(&document).contains("[image"));
     }
 
     #[test]

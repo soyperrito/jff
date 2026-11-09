@@ -1064,8 +1064,7 @@ $$
 
 Se muestran como una línea independiente, indentada y con el color `math`.
 
-Las imágenes no se renderizan. La sintaxis Markdown de imagen se muestra como
-texto, por ejemplo `[image: descripción]`.
+Las imágenes no están soportadas: la sintaxis Markdown de imagen se ignora.
 
 ---
 
