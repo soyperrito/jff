@@ -10,6 +10,7 @@ use ratatui_image::protocol::StatefulProtocol;
 use ratatui_image::{FilterType, Resize, StatefulImage};
 
 use super::app::{App, Focus};
+use super::image::draw_quadrants;
 use super::markdown::{Block as MdBlock, DiagramRef, ImageRef};
 use super::theme::Theme;
 
@@ -340,44 +341,58 @@ fn draw_image(frame: &mut Frame, app: &mut App, image: &ImageRef, area: Rect, fu
         }
     };
 
-    match images.protocol(&path) {
-        Ok(protocol) => {
-            let caption_height = 1.min(area.height);
-            let image_height = area.height.saturating_sub(caption_height);
+    let caption_height = 1.min(area.height);
+    let image_height = area.height.saturating_sub(caption_height);
+    let image_area = Rect {
+        height: image_height,
+        ..area
+    };
 
-            if image_height > 0 {
-                let image_area = Rect {
-                    height: image_height,
-                    ..area
-                };
+    let result = if image_height == 0 {
+        Ok(())
+    } else if images.uses_quadrants() {
+        match images.quadrants(&path, image_area.width, image_area.height) {
+            Ok(bitmap) => {
+                draw_quadrants(frame.buffer_mut(), image_area, bitmap);
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    } else {
+        match images.protocol(&path) {
+            Ok(protocol) => {
                 let widget: StatefulImage<StatefulProtocol> =
                     StatefulImage::new().resize(Resize::Scale(Some(FilterType::Lanczos3)));
                 frame.render_stateful_widget(widget, image_area, protocol);
+                Ok(())
             }
+            Err(error) => Err(error),
+        }
+    };
 
-            if caption_height > 0 {
-                let caption_area = Rect {
-                    y: area.y + image_height,
-                    height: caption_height,
-                    ..area
-                };
-                frame.render_widget(
-                    Paragraph::new(Line::from(Span::styled(
-                        format!("[image: {caption}]"),
-                        Style::default().fg(image_color),
-                    ))),
-                    caption_area,
-                );
-            }
-        }
-        Err(error) => {
-            draw_image_message(
-                frame,
-                area,
-                &format!("[image: {caption}] {error}"),
-                app.theme.error,
-            );
-        }
+    if let Err(error) = result {
+        draw_image_message(
+            frame,
+            area,
+            &format!("[image: {caption}] {error}"),
+            app.theme.error,
+        );
+        return;
+    }
+
+    if caption_height > 0 {
+        let caption_area = Rect {
+            y: area.y + image_height,
+            height: caption_height,
+            ..area
+        };
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!("[image: {caption}]"),
+                Style::default().fg(image_color),
+            ))),
+            caption_area,
+        );
     }
 }
 

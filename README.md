@@ -219,9 +219,9 @@ protocol is auto-detected; it can be forced with `images.protocol`:
 }
 ```
 
-Values: `auto`, `halfblocks`, `kitty`, `sixel`, `iterm2`. The half-blocks
-fallback is intentionally low-resolution; choosing a graphics-capable terminal
-is the only way to get full image quality.
+Values: `auto`, `halfblocks`, `quadrants`, `kitty`, `sixel`, `iterm2`. The
+half-blocks/quadrants fallback is intentionally low-resolution; choosing a
+graphics-capable terminal is the only way to get full image quality.
 
 Math:
 

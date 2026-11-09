@@ -5,6 +5,10 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use image::{DynamicImage, RgbaImage};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
 use ratatui_image::picker::Picker;
 use ratatui_image::picker::ProtocolType;
 use ratatui_image::protocol::StatefulProtocol;
@@ -16,11 +20,18 @@ const MAX_DIMENSION: u32 = 16_384;
 const MAX_DECODE_ALLOC: u64 = 256 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(15);
 
+const QUADRANTS: [char; 16] = [
+    ' ', '▘', '▝', '▀', '▖', '▌', '▞', '▛', '▗', '▚', '▐', '▜', '▄', '▙', '▟', '█',
+];
+
 pub struct ImageManager {
     picker: Picker,
     agent: ureq::Agent,
     config: Images,
     cache: HashMap<PathBuf, CachedImage>,
+    image_cache: HashMap<PathBuf, Result<DynamicImage, String>>,
+    quadrant_cache: HashMap<(PathBuf, u16, u16), RgbaImage>,
+    force_quadrants: bool,
 }
 
 enum CachedImage {
@@ -31,10 +42,12 @@ enum CachedImage {
 impl ImageManager {
     pub fn new(config: &Images) -> Self {
         let mut picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
+        let mut force_quadrants = false;
 
         match config.protocol.to_ascii_lowercase().as_str() {
-            "halfblocks" | "half-blocks" | "blocks" => {
+            "halfblocks" | "half-blocks" | "blocks" | "quadrants" => {
                 picker.set_protocol_type(ProtocolType::Halfblocks);
+                force_quadrants = true;
             }
             "kitty" => picker.set_protocol_type(ProtocolType::Kitty),
             "sixel" => picker.set_protocol_type(ProtocolType::Sixel),
@@ -42,7 +55,41 @@ impl ImageManager {
             _ => {}
         }
 
-        Self::with_picker(config.clone(), picker)
+        let mut manager = Self::with_picker(config.clone(), picker);
+        manager.force_quadrants = force_quadrants;
+        manager
+    }
+
+    pub fn uses_quadrants(&self) -> bool {
+        self.force_quadrants || matches!(self.picker.protocol_type(), ProtocolType::Halfblocks)
+    }
+
+    pub fn quadrants(
+        &mut self,
+        path: &Path,
+        width: u16,
+        height: u16,
+    ) -> Result<&RgbaImage, String> {
+        let key = (path.to_path_buf(), width, height);
+
+        if !self.quadrant_cache.contains_key(&key) {
+            let target_width = u32::from(width).saturating_mul(2).max(1);
+            let target_height = u32::from(height).saturating_mul(2).max(1);
+            let resized = self
+                .dynamic(path)?
+                .resize_exact(
+                    target_width,
+                    target_height,
+                    image::imageops::FilterType::Lanczos3,
+                )
+                .to_rgba8();
+            self.quadrant_cache.insert(key.clone(), resized);
+        }
+
+        match self.quadrant_cache.get(&key) {
+            Some(image) => Ok(image),
+            None => Err("quadrant image is not available".to_string()),
+        }
     }
 
     fn with_picker(config: Images, picker: Picker) -> Self {
@@ -57,6 +104,9 @@ impl ImageManager {
             agent,
             config,
             cache: HashMap::new(),
+            image_cache: HashMap::new(),
+            quadrant_cache: HashMap::new(),
+            force_quadrants: false,
         }
     }
 
@@ -203,9 +253,28 @@ impl ImageManager {
 
     pub fn clear(&mut self) {
         self.cache.clear();
+        self.image_cache.clear();
+        self.quadrant_cache.clear();
+    }
+
+    fn dynamic(&mut self, path: &Path) -> Result<&DynamicImage, String> {
+        if !self.image_cache.contains_key(path) {
+            let image = self.decode(path);
+            self.image_cache.insert(path.to_path_buf(), image);
+        }
+
+        match self.image_cache.get(path) {
+            Some(Ok(image)) => Ok(image),
+            Some(Err(error)) => Err(error.clone()),
+            None => Err("image is not available".to_string()),
+        }
     }
 
     fn load(&self, path: &Path) -> Result<StatefulProtocol, String> {
+        Ok(self.picker.new_resize_protocol(self.decode(path)?))
+    }
+
+    fn decode(&self, path: &Path) -> Result<DynamicImage, String> {
         let mut reader = image::ImageReader::open(path)
             .map_err(|error| error.to_string())?
             .with_guessed_format()
@@ -226,7 +295,7 @@ impl ImageManager {
             ));
         }
 
-        Ok(self.picker.new_resize_protocol(image))
+        Ok(image)
     }
 
     #[cfg(test)]
@@ -241,6 +310,125 @@ fn list_contains(list: &[String], extension: &str) -> bool {
         let item = item.rsplit('/').next().unwrap_or(item);
         item.eq_ignore_ascii_case(extension)
     })
+}
+
+/// Draw a pre-resized RGBA image using 2x2 Unicode quadrants.
+pub(crate) fn draw_quadrants(buffer: &mut Buffer, area: Rect, image: &RgbaImage) {
+    let needed_width = u32::from(area.width) * 2;
+    let needed_height = u32::from(area.height) * 2;
+
+    if image.width() < needed_width || image.height() < needed_height {
+        return;
+    }
+
+    for y in 0..area.height {
+        for x in 0..area.width {
+            let left = u32::from(x) * 2;
+            let top = u32::from(y) * 2;
+            let pixels = [
+                rgba(image.get_pixel(left, top)),
+                rgba(image.get_pixel(left + 1, top)),
+                rgba(image.get_pixel(left, top + 1)),
+                rgba(image.get_pixel(left + 1, top + 1)),
+            ];
+            let (character, foreground, background) = quadrant_cell(pixels);
+
+            if let Some(cell) = buffer.cell_mut((area.x + x, area.y + y)) {
+                cell.set_char(character)
+                    .set_fg(foreground)
+                    .set_bg(background);
+            }
+        }
+    }
+}
+
+fn quadrant_cell(pixels: [[u8; 4]; 4]) -> (char, Color, Color) {
+    if pixels.iter().all(|pixel| pixel[3] < 16) {
+        return (' ', Color::Reset, Color::Reset);
+    }
+
+    let colors = pixels.map(|pixel| [pixel[0], pixel[1], pixel[2]]);
+    let mut first = 0usize;
+    let mut second = 1usize;
+    let mut best_distance = 0u32;
+
+    for left in 0..4 {
+        for right in (left + 1)..4 {
+            let distance = distance2(colors[left], colors[right]);
+
+            if distance > best_distance {
+                best_distance = distance;
+                first = left;
+                second = right;
+            }
+        }
+    }
+
+    if best_distance == 0 {
+        let color = average(&colors, &[true; 4]);
+        let color = Color::Rgb(color[0], color[1], color[2]);
+        return ('█', color, color);
+    }
+
+    let center_first = colors[first];
+    let center_second = colors[second];
+    let mut assigned = [false; 4];
+    let mut mask = 0usize;
+
+    for (index, color) in colors.iter().enumerate() {
+        assigned[index] = distance2(*color, center_first) <= distance2(*color, center_second);
+
+        if assigned[index] {
+            mask |= 1 << index;
+        }
+    }
+
+    let foreground = average(&colors, &assigned);
+    let background = average(&colors, &assigned.map(|is_foreground| !is_foreground));
+
+    (
+        QUADRANTS[mask],
+        Color::Rgb(foreground[0], foreground[1], foreground[2]),
+        Color::Rgb(background[0], background[1], background[2]),
+    )
+}
+
+fn rgba(pixel: &image::Rgba<u8>) -> [u8; 4] {
+    pixel.0
+}
+
+fn distance2(left: [u8; 3], right: [u8; 3]) -> u32 {
+    let red = i32::from(left[0]) - i32::from(right[0]);
+    let green = i32::from(left[1]) - i32::from(right[1]);
+    let blue = i32::from(left[2]) - i32::from(right[2]);
+
+    (red * red + green * green + blue * blue) as u32
+}
+
+fn average(colors: &[[u8; 3]; 4], selected: &[bool; 4]) -> [u8; 3] {
+    let mut red = 0u32;
+    let mut green = 0u32;
+    let mut blue = 0u32;
+    let mut count = 0u32;
+
+    for (index, color) in colors.iter().enumerate() {
+        if selected[index] {
+            red += u32::from(color[0]);
+            green += u32::from(color[1]);
+            blue += u32::from(color[2]);
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        return colors[0];
+    }
+
+    [
+        (red / count) as u8,
+        (green / count) as u8,
+        (blue / count) as u8,
+    ]
 }
 
 #[cfg(test)]
@@ -328,6 +516,22 @@ mod tests {
             .expect_err("pixel limit exceeded");
 
         assert!(error.contains("too many pixels"));
+    }
+
+    #[test]
+    fn quadrant_cells_map_2x2_patterns() {
+        let red = [255, 0, 0, 255];
+        let blue = [0, 0, 255, 255];
+
+        let (character, foreground, background) = quadrant_cell([red, blue, blue, blue]);
+        assert_eq!(character, '▘');
+        assert_eq!(foreground, Color::Rgb(255, 0, 0));
+        assert_eq!(background, Color::Rgb(0, 0, 255));
+
+        let (character, foreground, background) = quadrant_cell([red; 4]);
+        assert_eq!(character, '█');
+        assert_eq!(foreground, Color::Rgb(255, 0, 0));
+        assert_eq!(background, Color::Rgb(255, 0, 0));
     }
 
     #[test]

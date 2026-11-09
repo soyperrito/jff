@@ -776,7 +776,7 @@ Reglas:
   ```json
   { "images": { "protocol": "kitty" } }
   ```
-  Valores: `auto`, `halfblocks`, `kitty`, `sixel`, `iterm2`.
+  Valores: `auto`, `halfblocks`, `quadrants`, `kitty`, `sixel`, `iterm2`.
 - Los tipos permitidos y excluidos se configuran en `images.mime` y
   `images.exclude`.
 - Límites:
