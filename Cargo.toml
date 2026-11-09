@@ -3,8 +3,11 @@ name = "jff"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.89"
-description = "Just For Fun - a personal knowledge base for terms and concepts"
-license = "MIT"
+authors = ["Rodrigo Quintanar <djperseo@outlook.es>"]
+description = "Just for Fun - Encyclopedic Dictionary"
+license = "GPL-3.0-only"
+repository = "https://github.com/soyperrito/jff"
+homepage = "https://github.com/soyperrito/jff"
 readme = "README.md"
 
 [dependencies]

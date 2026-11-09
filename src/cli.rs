@@ -8,7 +8,7 @@ use crate::model::Kind;
 #[command(
     name = "jff",
     version,
-    about = "Just For Fun - a personal knowledge base for terms and concepts",
+    about = "Just for Fun - Encyclopedic Dictionary",
     args_conflicts_with_subcommands = true,
     group = ArgGroup::new("action")
         .args(["term", "concept", "list", "delete"])

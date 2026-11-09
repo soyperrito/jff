@@ -1,6 +1,7 @@
-# jff
+# Just for Fun - Encyclopedic Dictionary
 
-**Just For Fun** — a local, Markdown-based knowledge base for terms and concepts.
+**Just for Fun - Encyclopedic Dictionary** (`jff`) — a local, Markdown-based
+knowledge base for terms and concepts.
 
 `jff` stores every term or concept as a Markdown file inside `~/.jff`, keeps a
 small JSON registry, and gives you fast exact, fuzzy and link-based search from
@@ -345,6 +346,25 @@ path-traversal protection, registry CRUD, atomic file creation, legacy CLI
 aliases, search, related links, editor launching, the Markdown renderer,
 image resolution/limits and TUI navigation state.
 
+## Maintainer
+
+Rodrigo Quintanar — [@perseoq](https://github.com/perseoq) — <djperseo@outlook.es>
+
+Repository: <https://github.com/soyperrito/jff>
+
 ## License
 
-MIT
+Copyright (C) 2026 Rodrigo Quintanar.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, version 3.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program. If not, see <https://www.gnu.org/licenses/>.
+
+See [LICENSE](LICENSE) for the full text.
