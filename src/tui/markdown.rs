@@ -1,4 +1,4 @@
-use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -7,7 +7,7 @@ use super::theme::Theme;
 pub fn render(content: &str, theme: &Theme) -> Document {
     let mut renderer = Renderer::new(theme);
 
-    for event in Parser::new(content) {
+    for event in Parser::new_ext(content, Options::ENABLE_MATH) {
         renderer.event(event);
     }
 
@@ -23,12 +23,19 @@ pub struct Document {
 pub enum Block {
     Text(Vec<Line<'static>>),
     Image(ImageRef),
+    Diagram(DiagramRef),
 }
 
 #[derive(Debug, Clone)]
 pub struct ImageRef {
     pub alt: String,
     pub dest: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DiagramRef {
+    pub language: String,
+    pub source: String,
 }
 
 enum ListKind {
@@ -45,6 +52,8 @@ struct Renderer<'a> {
     pending_prefix: Option<String>,
     item_prefix: Option<String>,
     code_block: bool,
+    diagram_language: Option<String>,
+    diagram_source: String,
     quote_depth: usize,
     lists: Vec<ListKind>,
     image_label: Option<String>,
@@ -62,6 +71,8 @@ impl<'a> Renderer<'a> {
             pending_prefix: None,
             item_prefix: None,
             code_block: false,
+            diagram_language: None,
+            diagram_source: String::new(),
             quote_depth: 0,
             lists: Vec::new(),
             image_label: None,
@@ -74,7 +85,9 @@ impl<'a> Renderer<'a> {
             Event::Start(tag) => self.start(tag),
             Event::End(tag) => self.end(tag),
             Event::Text(text) => {
-                if let Some(label) = self.image_label.as_mut() {
+                if self.diagram_language.is_some() {
+                    self.diagram_source.push_str(&text);
+                } else if let Some(label) = self.image_label.as_mut() {
                     label.push_str(&text);
                 } else if self.code_block {
                     self.code_text(&text);
@@ -89,6 +102,8 @@ impl<'a> Renderer<'a> {
                     self.inline_code(&text);
                 }
             }
+            Event::InlineMath(text) => self.inline_math(&text),
+            Event::DisplayMath(text) => self.display_math(&text),
             Event::SoftBreak => self.text(" "),
             Event::HardBreak => self.hard_break(),
             Event::Rule => self.rule(),
@@ -97,7 +112,6 @@ impl<'a> Renderer<'a> {
             }
             Event::FootnoteReference(name) => self.text(&format!("[^{name}]")),
             Event::Html(_) | Event::InlineHtml(_) => {}
-            _ => {}
         }
     }
 
@@ -132,11 +146,33 @@ impl<'a> Renderer<'a> {
             Tag::Emphasis => self.push_modifier(Modifier::ITALIC),
             Tag::Strong => self.push_modifier(Modifier::BOLD),
             Tag::Strikethrough => self.push_modifier(Modifier::CROSSED_OUT),
-            Tag::CodeBlock(_) => {
+            Tag::CodeBlock(kind) => {
                 self.finish_line();
                 self.blank();
-                self.code_block = true;
-                self.pending_prefix = Some("  ".to_string());
+
+                let diagram = match kind {
+                    CodeBlockKind::Fenced(info) => {
+                        let language = info
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or_default()
+                            .to_ascii_lowercase();
+
+                        match language.as_str() {
+                            "mermaid" | "mmd" | "dot" | "graphviz" | "typst" => Some(language),
+                            _ => None,
+                        }
+                    }
+                    CodeBlockKind::Indented => None,
+                };
+
+                if let Some(language) = diagram {
+                    self.diagram_language = Some(language);
+                    self.diagram_source.clear();
+                } else {
+                    self.code_block = true;
+                    self.pending_prefix = Some("  ".to_string());
+                }
             }
             Tag::List(start) => {
                 self.finish_line();
@@ -196,6 +232,17 @@ impl<'a> Renderer<'a> {
                 self.pop_style()
             }
             TagEnd::CodeBlock => {
+                if let Some(language) = self.diagram_language.take() {
+                    let source = std::mem::take(&mut self.diagram_source);
+                    self.finish_line();
+                    self.flush_text();
+                    self.blocks.push(Block::Diagram(DiagramRef {
+                        language,
+                        source: source.trim_end().to_string(),
+                    }));
+                    return;
+                }
+
                 self.finish_line();
                 self.code_block = false;
                 self.pending_prefix = None;
@@ -307,6 +354,31 @@ impl<'a> Renderer<'a> {
             .bg(self.theme.code_bg)
             .add_modifier(Modifier::BOLD);
         self.current.push(Span::styled(format!(" {text} "), style));
+    }
+
+    fn inline_math(&mut self, text: &str) {
+        self.ensure_prefix();
+        let rendered = unicodeit::replace(text);
+        let style = self
+            .current_style()
+            .fg(self.theme.math)
+            .add_modifier(Modifier::ITALIC);
+        self.current
+            .push(Span::styled(format!(" {rendered} "), style));
+    }
+
+    fn display_math(&mut self, text: &str) {
+        self.finish_line();
+        self.blank();
+
+        let rendered = unicodeit::replace(text.trim());
+        self.lines.push(Line::styled(
+            format!("  {rendered}"),
+            Style::default()
+                .fg(self.theme.math)
+                .add_modifier(Modifier::BOLD),
+        ));
+        self.blank();
     }
 
     fn code_text(&mut self, text: &str) {
@@ -422,7 +494,18 @@ mod tests {
             .iter()
             .filter_map(|block| match block {
                 Block::Image(image) => Some(image),
-                Block::Text(_) => None,
+                Block::Text(_) | Block::Diagram(_) => None,
+            })
+            .collect()
+    }
+
+    fn diagrams_of(document: &Document) -> Vec<&DiagramRef> {
+        document
+            .blocks
+            .iter()
+            .filter_map(|block| match block {
+                Block::Diagram(diagram) => Some(diagram),
+                Block::Text(_) | Block::Image(_) => None,
             })
             .collect()
     }
@@ -484,5 +567,30 @@ mod tests {
         assert!(matches!(document.blocks[2], Block::Text(_)));
         assert_eq!(text_of(&document).matches("Before").count(), 1);
         assert_eq!(text_of(&document).matches("After").count(), 1);
+    }
+
+    #[test]
+    fn renders_latex_math_as_unicode() {
+        let document = render("Euler: $e^{i\\pi}+1=0$\n\n$$\\alpha + \\beta$$\n", &theme());
+        let text = text_of(&document);
+
+        assert!(text.contains('π'));
+        assert!(text.contains('α'));
+        assert!(text.contains('β'));
+    }
+
+    #[test]
+    fn parses_diagram_code_fences() {
+        let document = render(
+            "```mermaid\ngraph TD\nA-->B\n```\n\n```dot\ndigraph { A -> B }\n```\n",
+            &theme(),
+        );
+        let diagrams = diagrams_of(&document);
+
+        assert_eq!(diagrams.len(), 2);
+        assert_eq!(diagrams[0].language, "mermaid");
+        assert!(diagrams[0].source.contains("A-->B"));
+        assert_eq!(diagrams[1].language, "dot");
+        assert!(diagrams[1].source.contains("A -> B"));
     }
 }

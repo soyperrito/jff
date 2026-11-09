@@ -176,6 +176,7 @@ pub struct Git {
     pub repo: Option<String>,
     pub autopush: bool,
     pub user: Option<String>,
+    pub email: Option<String>,
     /// Name of the environment variable that holds the token.
     /// Credentials are never read from the config file.
     pub token_env: String,
@@ -187,6 +188,7 @@ impl Default for Git {
             repo: None,
             autopush: false,
             user: None,
+            email: None,
             token_env: "JFF_GIT_TOKEN".to_string(),
         }
     }
@@ -216,6 +218,8 @@ pub struct ThemeColors {
     pub code: String,
     pub code_bg: String,
     pub image: String,
+    pub math: String,
+    pub diagram: String,
     pub highlight_fg: String,
     pub highlight_bg: String,
     pub scrollbar: String,
@@ -236,6 +240,8 @@ impl Default for ThemeColors {
             code: "#C0C0C0".to_string(),
             code_bg: "#303030".to_string(),
             image: "#C0C0C0".to_string(),
+            math: "#F1FA8C".to_string(),
+            diagram: "#FF79C6".to_string(),
             highlight_fg: "#FFFFFF".to_string(),
             highlight_bg: "#444444".to_string(),
             scrollbar: "#444444".to_string(),

@@ -1,4 +1,5 @@
 pub mod app;
+pub mod diagram;
 pub mod image;
 pub mod markdown;
 pub mod theme;
@@ -48,7 +49,17 @@ pub fn run(store: Store, config: Config, entry: Entry) -> Result<()> {
                     session.resume()?;
 
                     match result {
-                        Ok(()) => app.reload(),
+                        Ok(()) => {
+                            app.reload();
+
+                            if let Err(error) = crate::git::autopush(
+                                app.store.root(),
+                                &app.config,
+                                &format!("edit {}", app.current.reference),
+                            ) {
+                                app.status = Some(format!("git: {error}"));
+                            }
+                        }
                         Err(error) => app.status = Some(format!("editor: {error}")),
                     }
                 }

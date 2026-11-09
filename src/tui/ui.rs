@@ -10,7 +10,8 @@ use ratatui_image::protocol::StatefulProtocol;
 use ratatui_image::{Resize, StatefulImage};
 
 use super::app::{App, Focus};
-use super::markdown::{Block as MdBlock, ImageRef};
+use super::markdown::{Block as MdBlock, DiagramRef, ImageRef};
+use super::theme::Theme;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
@@ -194,6 +195,10 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
             MdBlock::Image(image) => {
                 draw_image(frame, app, &image, rect, fully_visible);
             }
+            MdBlock::Diagram(diagram) => {
+                let skip = viewport_top.saturating_sub(block_top);
+                draw_diagram(frame, app, &diagram, rect, fully_visible, skip);
+            }
         }
     }
 
@@ -241,6 +246,22 @@ fn content_layout(app: &App, width: u16, max_height: u16) -> Vec<LayoutEntry> {
                 }
 
                 let height = image_block_height(width, max_height, app.images.is_some());
+                layout.push(LayoutEntry { index, top, height });
+                top = top.saturating_add(height).saturating_add(1);
+            }
+            MdBlock::Diagram(diagram) => {
+                if top > 0 {
+                    top = top.saturating_add(1);
+                }
+
+                let can_render = app.diagrams.supports(&diagram.language) && app.images.is_some();
+                let height = if can_render {
+                    image_block_height(width, max_height, true)
+                } else {
+                    let lines = diagram_source_lines(diagram, &app.theme, None);
+                    text_height(&lines, width).min(max_height).max(1)
+                };
+
                 layout.push(LayoutEntry { index, top, height });
                 top = top.saturating_add(height).saturating_add(1);
             }
@@ -373,6 +394,100 @@ fn draw_image_message(frame: &mut Frame, area: Rect, message: &str, color: Color
         .wrap(Wrap { trim: true }),
         area,
     );
+}
+
+fn draw_diagram(
+    frame: &mut Frame,
+    app: &mut App,
+    diagram: &DiagramRef,
+    area: Rect,
+    fully_visible: bool,
+    skip: u16,
+) {
+    let can_render = app.diagrams.supports(&diagram.language) && app.images.is_some();
+
+    if !can_render {
+        draw_diagram_source(frame, app, diagram, area, skip, None);
+        return;
+    }
+
+    if !fully_visible {
+        draw_image_message(
+            frame,
+            area,
+            &format!("[{} diagram] scroll to view", diagram.language),
+            app.theme.diagram,
+        );
+        return;
+    }
+
+    let root = app.store.root().to_path_buf();
+
+    match app
+        .diagrams
+        .render(&root, &diagram.language, &diagram.source)
+    {
+        Ok(path) => {
+            let image = ImageRef {
+                alt: format!("{} diagram", diagram.language),
+                dest: path.to_string_lossy().into_owned(),
+            };
+            draw_image(frame, app, &image, area, true);
+        }
+        Err(error) => {
+            draw_diagram_source(frame, app, diagram, area, 0, Some(&error));
+        }
+    }
+}
+
+fn draw_diagram_source(
+    frame: &mut Frame,
+    app: &App,
+    diagram: &DiagramRef,
+    area: Rect,
+    skip: u16,
+    error: Option<&str>,
+) {
+    let lines = diagram_source_lines(diagram, &app.theme, error);
+    let paragraph = Paragraph::new(Text::from(lines)).wrap(Wrap { trim: false });
+
+    frame.render_widget(paragraph.scroll((skip, 0)), area);
+}
+
+fn diagram_source_lines(
+    diagram: &DiagramRef,
+    theme: &Theme,
+    error: Option<&str>,
+) -> Vec<Line<'static>> {
+    let mut lines = vec![Line::from(Span::styled(
+        format!("[{} diagram]", diagram.language),
+        Style::default()
+            .fg(theme.diagram)
+            .add_modifier(Modifier::BOLD),
+    ))];
+
+    if let Some(error) = error {
+        lines.push(Line::from(Span::styled(
+            format!("! {error}"),
+            Style::default().fg(theme.error),
+        )));
+    }
+
+    if diagram.source.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  (empty diagram)",
+            Style::default().fg(theme.muted),
+        )));
+    }
+
+    for line in diagram.source.lines() {
+        lines.push(Line::from(Span::styled(
+            format!("  {line}"),
+            Style::default().fg(theme.code).bg(theme.code_bg),
+        )));
+    }
+
+    lines
 }
 
 fn draw_related(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {

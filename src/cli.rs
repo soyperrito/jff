@@ -118,6 +118,9 @@ pub enum Command {
         editor: Option<EditorArg>,
     },
 
+    /// Commit and push the knowledge base
+    Sync,
+
     /// Inspect or initialize configuration
     Config {
         #[command(subcommand)]

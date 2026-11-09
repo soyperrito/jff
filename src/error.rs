@@ -40,6 +40,9 @@ pub enum Error {
     #[error("theme error: {0}")]
     Theme(String),
 
+    #[error("git error: {0}")]
+    Git(String),
+
     #[error("home directory could not be determined; set JFF_HOME")]
     NoHome,
 }

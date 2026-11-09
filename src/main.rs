@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod editor;
 mod error;
+mod git;
 mod links;
 mod model;
 mod refs;
@@ -74,7 +75,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
     }
 
     if let Some(reference) = cli.delete {
-        return delete(&store, &reference);
+        return delete(&store, &config, &reference);
     }
 
     match cli.command {
@@ -83,14 +84,14 @@ fn run(cli: Cli) -> Result<ExitCode> {
             open_existing(&store, &config, Kind::Concept, &title)
         }
         Some(CliCommand::Create { term, concept }) => match (term, concept) {
-            (Some(path), None) => create_from_file(&store, Kind::Term, &path),
-            (None, Some(path)) => create_from_file(&store, Kind::Concept, &path),
+            (Some(path), None) => create_from_file(&store, &config, Kind::Term, &path),
+            (None, Some(path)) => create_from_file(&store, &config, Kind::Concept, &path),
             _ => bail!("jff create requires exactly one of -t/--term or -c/--concept"),
         },
         Some(CliCommand::List { kind, letter, json }) => {
             list(&store, kind.map(Kind::from), letter, json)
         }
-        Some(CliCommand::Delete { reference }) => delete(&store, &reference),
+        Some(CliCommand::Delete { reference }) => delete(&store, &config, &reference),
         Some(CliCommand::Find {
             query,
             kind,
@@ -104,8 +105,10 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let entry = store.get(&reference)?;
             editor::open(&store, &config, &entry, editor)?;
             println!("edited {} {}", entry.kind, entry.reference);
+            autopush_or_warn(store.root(), &config, &format!("edit {}", entry.reference));
             Ok(ExitCode::SUCCESS)
         }
+        Some(CliCommand::Sync) => sync_command(&store, &config),
         Some(CliCommand::Config { cmd }) => config_command(&store, cmd),
         None => {
             Cli::command().print_help()?;
@@ -169,7 +172,12 @@ fn resolve_exact(store: &Store, query: &str, kind: Kind) -> Result<Entry> {
     }
 }
 
-fn create_from_file(store: &Store, kind: Kind, source: &Path) -> Result<ExitCode> {
+fn create_from_file(
+    store: &Store,
+    config: &config::Config,
+    kind: Kind,
+    source: &Path,
+) -> Result<ExitCode> {
     let existed = source.exists();
     let entry = store.create_from_file(kind, source)?;
 
@@ -180,6 +188,8 @@ fn create_from_file(store: &Store, kind: Kind, source: &Path) -> Result<ExitCode
     if existed {
         println!("from: {}", source.display());
     }
+
+    autopush_or_warn(store.root(), config, &format!("create {}", entry.reference));
 
     Ok(ExitCode::SUCCESS)
 }
@@ -316,13 +326,26 @@ fn print_related(store: &Store, entry: &Entry, json: bool) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn delete(store: &Store, reference: &str) -> Result<ExitCode> {
+fn delete(store: &Store, config: &config::Config, reference: &str) -> Result<ExitCode> {
     let entry = store.delete(reference)?;
     println!(
         "deleted {} \"{}\" ({})",
         entry.kind, entry.title, entry.reference
     );
+    autopush_or_warn(store.root(), config, &format!("delete {}", entry.reference));
     Ok(ExitCode::SUCCESS)
+}
+
+fn sync_command(store: &Store, config: &config::Config) -> Result<ExitCode> {
+    git::sync(store.root(), config, "manual sync")?;
+    println!("synced {}", store.root().display());
+    Ok(ExitCode::SUCCESS)
+}
+
+fn autopush_or_warn(root: &Path, config: &config::Config, reason: &str) {
+    if let Err(error) = git::autopush(root, config, reason) {
+        eprintln!("jff: git autopush failed: {error}");
+    }
 }
 
 fn config_command(store: &Store, command: ConfigCommand) -> Result<ExitCode> {

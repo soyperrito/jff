@@ -421,6 +421,114 @@ fn create_requires_exactly_one_kind_flag() {
 }
 
 #[test]
+fn autopush_commits_to_a_local_remote() {
+    let home = TempDir::new().expect("temp dir");
+    let remote = home.path().join("remote.git");
+
+    let git = std::process::Command::new("git")
+        .args(["init", "--bare", remote.to_str().expect("remote path")])
+        .current_dir(home.path())
+        .output();
+
+    let Ok(git) = git else {
+        return;
+    };
+
+    assert!(
+        git.status.success(),
+        "{}",
+        String::from_utf8_lossy(&git.stderr)
+    );
+
+    let config = serde_json::json!({
+        "git": {
+            "repo": remote,
+            "autopush": true,
+            "user": "Test User",
+            "email": "test@example.com"
+        }
+    });
+    fs::write(
+        home.path().join("config.json"),
+        serde_json::to_string_pretty(&config).expect("config JSON"),
+    )
+    .expect("config");
+
+    let source = home.path().join("inbox/water.md");
+    fs::create_dir_all(source.parent().expect("inbox")).expect("inbox");
+    fs::write(&source, "# Water\n\nAutopush test.\n").expect("source");
+
+    ok(
+        home.path(),
+        &["create", "-t", source.to_str().expect("path")],
+    );
+
+    let output = std::process::Command::new("git")
+        .arg("--git-dir")
+        .arg(&remote)
+        .args(["rev-parse", "--verify", "refs/heads/main"])
+        .output()
+        .expect("rev-parse remote");
+
+    assert!(output.status.success(), "autopush did not create a commit");
+}
+
+#[test]
+fn sync_command_pushes_to_a_local_remote() {
+    let home = TempDir::new().expect("temp dir");
+    let remote = home.path().join("sync-remote.git");
+
+    let git = std::process::Command::new("git")
+        .args(["init", "--bare", remote.to_str().expect("remote path")])
+        .current_dir(home.path())
+        .output();
+
+    let Ok(git) = git else {
+        return;
+    };
+
+    assert!(
+        git.status.success(),
+        "{}",
+        String::from_utf8_lossy(&git.stderr)
+    );
+
+    let config = serde_json::json!({
+        "git": {
+            "repo": remote,
+            "autopush": false,
+            "user": "Test User",
+            "email": "test@example.com"
+        }
+    });
+    fs::write(
+        home.path().join("config.json"),
+        serde_json::to_string_pretty(&config).expect("config JSON"),
+    )
+    .expect("config");
+
+    let source = home.path().join("inbox/wind.md");
+    fs::create_dir_all(source.parent().expect("inbox")).expect("inbox");
+    fs::write(&source, "# Wind\n\nManual sync test.\n").expect("source");
+    ok(
+        home.path(),
+        &["create", "-t", source.to_str().expect("path")],
+    );
+
+    let stdout = ok(home.path(), &["sync"]);
+    assert!(stdout.contains("synced"));
+
+    let output = std::process::Command::new("git")
+        .arg("--git-dir")
+        .arg(&remote)
+        .args(["rev-parse", "--verify", "refs/heads/main"])
+        .output()
+        .expect("rev-parse remote");
+
+    assert!(output.status.success(), "sync did not create a commit");
+}
+
+#[test]
 fn broken_pipe_does_not_panic() {
     let home = TempDir::new().expect("temp dir");
     let source = home.path().join("inbox/long.md");

@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::model::Entry;
 use crate::store::{Related, Store};
 
+use super::diagram::DiagramRenderer;
 use super::image::ImageManager;
 use super::markdown;
 use super::theme::Theme;
@@ -31,6 +32,7 @@ pub struct App {
     pub content: String,
     pub rendered: markdown::Document,
     pub images: Option<ImageManager>,
+    pub diagrams: DiagramRenderer,
     pub related: Vec<Related>,
     pub history: Vec<Entry>,
     pub focus: Focus,
@@ -53,6 +55,7 @@ impl App {
             content: String::new(),
             rendered: markdown::Document::default(),
             images,
+            diagrams: DiagramRenderer::new(),
             related: Vec::new(),
             history: Vec::new(),
             focus: Focus::Content,

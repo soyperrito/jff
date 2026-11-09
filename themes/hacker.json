@@ -10,6 +10,8 @@
   "code": "#00FF41",
   "code_bg": "#001100",
   "image": "#00FF41",
+  "math": "#00FF41",
+  "diagram": "#33FF33",
   "highlight_fg": "#000000",
   "highlight_bg": "#00FF41",
   "scrollbar": "#005500",

@@ -11,8 +11,9 @@ TUI para leer, navegar y editar.
 - **Repositorio:** <https://github.com/soyperrito/jff>
 - **Licencia:** GPL-3.0-only
 
-> Este manual documenta el estado actual: CLI, TUI, imágenes, scrollbar y
-> temas. LaTeX/diagramas y Git autopush todavía no están implementados.
+> Este manual documenta el estado actual: CLI, TUI, imágenes, scrollbar,
+> temas, matemáticas, diagramas y sincronización Git. Los renderizadores
+> externos de diagramas y Git son opcionales.
 
 ---
 
@@ -34,6 +35,8 @@ TUI para leer, navegar y editar.
 14. [Códigos de salida y errores](#14-códigos-de-salida-y-errores)
 15. [Alias legacy](#15-alias-legacy)
 16. [Solución de problemas](#16-solución-de-problemas)
+17. [Matemáticas y diagramas](#17-matemáticas-y-diagramas)
+18. [Git y sincronización](#18-git-y-sincronización)
 
 ---
 
@@ -485,6 +488,7 @@ jff config show       # imprime la configuración efectiva, con tema aplicado
     "repo": null,
     "autopush": false,
     "user": null,
+    "email": null,
     "token_env": "JFF_GIT_TOKEN"
   },
   "colors": {
@@ -500,6 +504,8 @@ jff config show       # imprime la configuración efectiva, con tema aplicado
     "code": "#C0C0C0",
     "code_bg": "#303030",
     "image": "#C0C0C0",
+    "math": "#F1FA8C",
+    "diagram": "#FF79C6",
     "highlight_fg": "#FFFFFF",
     "highlight_bg": "#444444",
     "scrollbar": "#444444",
@@ -544,6 +550,8 @@ Notas:
 | `error` | Enlaces rotos y errores |
 | `code` / `code_bg` | Código inline y bloques de código |
 | `image` | Caption/placeholder de imágenes |
+| `math` | Fórmulas inline y en bloque |
+| `diagram` | Etiquetas y fuente de diagramas |
 | `highlight_fg` / `highlight_bg` | Fila seleccionada |
 | `scrollbar` / `scrollbar_thumb` | Scrollbar del contenido |
 
@@ -1033,6 +1041,194 @@ jff find water --json
 ```sh
 jff edit <ref> --editor custom
 jff -eo <ref>
+```
+
+### Git no sincroniza
+
+Comprueba:
+
+```sh
+jff config show | jq '.git'
+git -C ~/.jff status
+git -C ~/.jff remote -v
+```
+
+- `git.repo` debe estar configurado.
+- Si usas HTTPS, exporta `JFF_GIT_TOKEN` o el nombre configurado en
+  `token_env`.
+- Si hay conflicto, sigue los pasos de la sección 18.4.
+- Un fallo de autopush no pierde cambios locales; ejecuta `jff sync` después
+  de corregir el problema.
+
+### Una fórmula no se ve bien
+
+`unicodeit` cubre una parte de LaTeX. Las construcciones complejas pueden
+quedar como texto parcial; el contenido original sigue visible en el Markdown.
+
+### Un diagrama muestra solo la fuente
+
+Instala la herramienta correspondiente:
+
+```sh
+command -v mmdc
+command -v dot
+command -v typst
+```
+
+Sin herramienta, `jff` muestra la fuente del diagrama como fallback.
+
+---
+
+## 17. Matemáticas y diagramas
+
+### 17.1 Fórmulas inline
+
+```markdown
+La energía es $E=mc^2$ y la identidad de Euler es $e^{i\pi}+1=0$.
+```
+
+`jff` convierte sintaxis LaTeX a Unicode con `unicodeit` y las muestra con el
+color `math`. Las fórmulas complejas pueden quedar parcialmente convertidas,
+pero el texto sigue siendo legible.
+
+### 17.2 Fórmulas en bloque
+
+```markdown
+$$
+\alpha + \beta = \gamma
+$$
+```
+
+Se muestran como una línea independiente, indentada y con el color `math`.
+
+### 17.3 Diagramas
+
+Bloques de código reconocidos:
+
+````markdown
+```mermaid
+graph TD
+  A[Water] --> B[Pollution]
+```
+````
+
+````markdown
+```dot
+digraph { A -> B }
+```
+````
+
+````markdown
+```typst
+#set page(width: 10cm, height: auto)
+= Diagram
+```
+````
+
+Comportamiento:
+
+- `mermaid` / `mmd` usa `mmdc`.
+- `dot` / `graphviz` usa `dot`.
+- `typst` usa `typst`.
+- Si la herramienta no está instalada, se muestra la fuente del diagrama con
+  las etiquetas y colores `diagram`/`code`.
+- Si la herramienta está instalada pero falla, se muestra el error y la fuente.
+- Las imágenes generadas se guardan en `~/.jff/.cache/diagrams/`.
+- Los colores se controlan con `math` y `diagram` en `colors` o en el tema.
+
+Comprobar herramientas:
+
+```sh
+command -v mmdc
+command -v dot
+command -v typst
+```
+
+---
+
+## 18. Git y sincronización
+
+### 18.1 Configuración
+
+```json
+{
+  "git": {
+    "repo": "https://github.com/soyperrito/jff.git",
+    "autopush": true,
+    "user": "Rodrigo Quintanar",
+    "email": "djperseo@outlook.es",
+    "token_env": "JFF_GIT_TOKEN"
+  }
+}
+```
+
+- `repo`: URL del remoto.
+- `autopush`: sincroniza automáticamente después de `create`, `delete` y
+  `edit`.
+- `user` / `email`: identidad usada en los commits.
+- `token_env`: nombre de la variable de entorno que contiene el token HTTPS.
+  La contraseña/token **no** se guarda en `config.json`.
+
+### 18.2 Sincronización manual
+
+```sh
+export JFF_GIT_TOKEN="tu_token"
+jff sync
+```
+
+`jff sync`:
+
+1. Inicializa `~/.jff` como repositorio Git si hace falta.
+2. Configura `origin`.
+3. Crea/actualiza `.gitignore` con `.lock`, `.cache/` y `*.tmp`.
+4. Hace `git add -A`.
+5. Crea un commit con la identidad configurada.
+6. Hace `fetch` y `pull --rebase --autostash`.
+7. Hace `push` a `origin`.
+
+La primera sincronización contra un remoto vacío crea la rama `main`.
+
+### 18.3 Autopush
+
+Con `"autopush": true`, `jff` sincroniza después de:
+
+```sh
+jff create -t archivo.md
+jff create -c archivo.md
+jff delete <ref>
+jff edit <ref>
+jff -t Water        # edición desde la TUI: suspende, edita y sincroniza
+```
+
+Si el autopush falla, la operación local no se pierde: se muestra una
+advertencia y el cambio queda en el store para el siguiente `jff sync`.
+
+### 18.4 Conflictos
+
+Antes de hacer push se ejecuta un rebase sobre el remoto. Si hay conflicto:
+
+- Se aborta el rebase.
+- Se devuelve un error indicando que hay que resolverlo.
+- Los cambios locales se conservan.
+
+Resolución:
+
+```sh
+cd ~/.jff
+git pull --rebase origin main
+# resolver archivos en conflicto
+git add <archivos>
+git rebase --continue
+jff sync
+```
+
+### 18.5 Inspección
+
+```sh
+git -C ~/.jff status
+git -C ~/.jff log --oneline
+git -C ~/.jff remote -v
+jff config show | jq '.git'
 ```
 
 ---

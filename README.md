@@ -7,8 +7,8 @@ knowledge base for terms and concepts.
 small JSON registry, and gives you fast exact, fuzzy and link-based search from
 the terminal.
 
-> Status: **MVP CLI + TUI (phases 0-2)**. LaTeX/diagram rendering and Git
-> autopush are planned but not implemented yet.
+> Status: **MVP CLI + TUI (phases 0-3)**. Phase 4 (packaging) is still
+> pending.
 
 Full command reference, themes, images and pipe examples:
 [MANUAL.md](MANUAL.md).
@@ -16,6 +16,8 @@ Full command reference, themes, images and pipe examples:
 ## Requirements
 
 - Rust 1.89 or newer (edition 2024)
+- `git` for synchronization (optional)
+- `mmdc`, `dot` or `typst` for diagram rendering (optional)
 
 ## Build and install
 
@@ -91,6 +93,7 @@ jff find <QUERY> [--kind ...] [--exact] [--json]
 jff related <QUERY> [--kind ...] [--json]
 jff delete <REF>
 jff edit <REF> [--editor nano|vim|code|emacs|custom]
+jff sync
 jff config path|init|show
 ```
 
@@ -251,6 +254,7 @@ from the specification is accepted as an alias for `weight`.
     "repo": null,
     "autopush": false,
     "user": null,
+    "email": null,
     "token_env": "JFF_GIT_TOKEN"
   },
   "colors": {
@@ -266,6 +270,8 @@ from the specification is accepted as an alias for `weight`.
     "code": "#C0C0C0",
     "code_bg": "#303030",
     "image": "#C0C0C0",
+    "math": "#F1FA8C",
+    "diagram": "#FF79C6",
     "highlight_fg": "#FFFFFF",
     "highlight_bg": "#444444",
     "scrollbar": "#444444",
@@ -304,6 +310,8 @@ the terminal default:
 - `error`: missing links and image errors.
 - `code` / `code_bg`: inline code and code blocks.
 - `image`: image captions and scroll-to-view placeholders.
+- `math`: inline and display math.
+- `diagram`: diagram labels and fallback source.
 - `highlight_fg` / `highlight_bg`: selected related row.
 - `scrollbar` / `scrollbar_thumb`: content scrollbar track and thumb.
 
@@ -367,6 +375,59 @@ remove `theme` (set it to `null`) and add the color keys you need.
 A missing or invalid theme is reported as an error. `jff config init` creates
 the `themes/` directory for convenience.
 
+## Math and diagrams
+
+Inline math `$...$` and display math `$$...$$` are converted to Unicode with
+`unicodeit` and rendered with the `math` color. Fenced blocks labelled
+`mermaid`, `dot`/`graphviz` or `typst` become diagram blocks:
+
+````markdown
+```mermaid
+graph TD
+  A[Water] --> B[Pollution]
+```
+````
+
+If the corresponding external tool is installed (`mmdc`, `dot` or `typst`),
+the diagram is rendered to a PNG under `~/.jff/.cache/diagrams/` and displayed
+inline with the image support. Otherwise the diagram source is shown with the
+`diagram` and `code` colors, so the note remains readable.
+
+## Git sync
+
+```json
+{
+  "git": {
+    "repo": "https://github.com/soyperrito/jff.git",
+    "autopush": true,
+    "user": "Rodrigo Quintanar",
+    "email": "djperseo@outlook.es",
+    "token_env": "JFF_GIT_TOKEN"
+  }
+}
+```
+
+- `jff sync` initializes `~/.jff` as a Git repository, commits pending changes
+  and pushes to `origin`.
+- With `autopush: true`, the same happens automatically after `create`,
+  `delete` and `edit`.
+- The generated `.gitignore` excludes `.lock`, `.cache/` and `*.tmp`.
+- `token_env` names the environment variable containing an HTTPS token.
+  Credentials are never read from `config.json`.
+- Synchronization performs `fetch` + `pull --rebase --autostash` before
+  pushing. If a rebase conflict occurs, it is aborted and a clear error is
+  returned. Resolve it manually:
+
+  ```sh
+  cd ~/.jff
+  git pull --rebase origin main
+  # resolver conflictos
+  git add <archivos>
+  git rebase --continue
+  jff sync
+  ```
+- The first sync to an empty remote creates the `main` branch.
+
 ## Design notes and deviations from the original spec
 
 - **One registry, not two.** `map.json` is the single source of truth; the
@@ -400,8 +461,9 @@ the `themes/` directory for convenience.
    list, link navigation and in-app editing.
 2. ✅ **Phase 2 — Images:** Kitty/Sixel/iTerm2 protocols with half-block
    fallback, inline rendering, path restrictions and size/pixel limits.
-3. **Phase 3 — Rich content and Git:** Typst/LaTeX, diagrams, autopush with
-   conflict handling.
+3. ✅ **Phase 3 — Rich content and Git:** LaTeX/Typst math to Unicode,
+   Mermaid/Graphviz/Typst diagrams with optional external renderers, Git
+   autopush and rebase conflict handling.
 4. **Phase 4 — Packaging:** shell completions, man page, CI, releases.
 
 ## Development
@@ -415,7 +477,8 @@ cargo test
 The test suite covers ref generation, slug/normalization, link extraction and
 path-traversal protection, registry CRUD, atomic file creation, legacy CLI
 aliases, search, related links, editor launching, the Markdown renderer,
-image resolution/limits and TUI navigation state.
+LaTeX-to-Unicode math, diagram parsing, image resolution/limits, Git sync and
+TUI navigation state.
 
 ## Maintainer
 
