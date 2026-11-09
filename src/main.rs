@@ -21,6 +21,8 @@ use crate::model::{Entry, Kind};
 use crate::store::Store;
 
 fn main() -> ExitCode {
+    install_broken_pipe_hook();
+
     let args = cli::normalize_legacy_args(std::env::args().collect());
     let cli = Cli::parse_from(args);
 
@@ -31,6 +33,27 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// `println!` panics on EPIPE. Treat a closed downstream pipe as a normal end
+/// of output so commands like `jff -t Water | head` do not print a panic.
+fn install_broken_pipe_hook() {
+    let default_hook = std::panic::take_hook();
+
+    std::panic::set_hook(Box::new(move |info| {
+        let payload = info.payload();
+        let message = payload
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+            .unwrap_or_default();
+
+        if message.contains("Broken pipe") || message.contains("os error 32") {
+            std::process::exit(0);
+        }
+
+        default_hook(info);
+    }));
 }
 
 fn run(cli: Cli) -> Result<ExitCode> {

@@ -421,6 +421,42 @@ fn create_requires_exactly_one_kind_flag() {
 }
 
 #[test]
+fn broken_pipe_does_not_panic() {
+    let home = TempDir::new().expect("temp dir");
+    let source = home.path().join("inbox/long.md");
+    let mut contents = String::from("# Long note\n\n");
+
+    for index in 0..4000 {
+        contents.push_str(&format!(
+            "Line {index}: contenido para forzar un pipe roto.\n"
+        ));
+    }
+
+    fs::create_dir_all(source.parent().unwrap()).expect("source dir");
+    fs::write(&source, contents).expect("long source");
+    ok(
+        home.path(),
+        &["create", "-t", source.to_str().expect("path")],
+    );
+
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_jff"))
+        .env("JFF_HOME", home.path())
+        .args(["-t", "Long note"])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn jff");
+
+    drop(child.stdout.take());
+
+    let output = child.wait_with_output().expect("wait for jff");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_ne!(output.status.code(), Some(101));
+    assert!(!stderr.contains("panicked"), "stderr: {stderr}");
+}
+
+#[test]
 fn opens_entries_with_a_custom_editor() {
     let home = TempDir::new().expect("temp dir");
     let reference = create_entry(home.path(), "term", "Water");

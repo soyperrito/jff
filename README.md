@@ -10,6 +10,9 @@ the terminal.
 > Status: **MVP CLI + TUI (phases 0-2)**. LaTeX/diagram rendering and Git
 > autopush are planned but not implemented yet.
 
+Full command reference, themes, images and pipe examples:
+[MANUAL.md](MANUAL.md).
+
 ## Requirements
 
 - Rust 1.89 or newer (edition 2024)
