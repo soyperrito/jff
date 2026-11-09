@@ -61,7 +61,7 @@ option list --> display related concepts or terms, in markdown fetch if the md f
 ~/.jff/terms/a/abraham.md
 ~/.jff/concepts/index.json
 ~/.jff/concepts/{a,b,c,e,f...z}
-~/.jff/concepts/w/water_polution.json
+~/.jff/concepts/w/water_pollution.json
 ```
 
 create term/concept
@@ -87,7 +87,7 @@ jff create -c/-t file.md
 {
     id: 001,
     ref: wc202610111344
-    term: "water polution",
+    term: "water pollution",
     letter: "w",
     path: "term/w/water.md",
 },
@@ -115,14 +115,14 @@ jff -set "water"
 search exact concept
 
 ```sh
-jff -sec "water polution"
+jff -sec "water pollution"
 # output if exist: ref <ref number> 
 ```
 
 search related term/concept and show on output terminal (based on `[more:term](/path/file.md)` or `[more:concept](/path/file.md)` )
 
 ```sh
-jff -src "water polution"
+jff -src "water pollution"
 jff -srt "water"
 # output if exist print a list: <term/concept> ref: <ref number> 
 ```

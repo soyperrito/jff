@@ -110,14 +110,14 @@ mod tests {
 
     #[test]
     fn normalize_removes_accents_and_collapses_separators() {
-        assert_eq!(normalize("Café  Polution!"), "cafe polution");
-        assert_eq!(normalize("water-polution"), "water polution");
+        assert_eq!(normalize("Café  Pollution!"), "cafe pollution");
+        assert_eq!(normalize("water-pollution"), "water pollution");
         assert_eq!(normalize("  ¡Hola,   Mundo!  "), "hola mundo");
     }
 
     #[test]
     fn slugify_makes_safe_file_stems() {
-        assert_eq!(slugify("Water Polution"), "water_polution");
+        assert_eq!(slugify("Water Pollution"), "water_pollution");
         assert_eq!(slugify("  ¡Hola, Mundo! "), "hola_mundo");
         assert_eq!(slugify("C++ / Rust"), "c_rust");
         assert_eq!(slugify("---"), "untitled");
@@ -137,8 +137,8 @@ mod tests {
             Some("Water".to_string())
         );
         assert_eq!(
-            title_from_markdown("---\ntitle: \"Water Polution\"\n---\n# Other\n"),
-            Some("Water Polution".to_string())
+            title_from_markdown("---\ntitle: \"Water Pollution\"\n---\n# Other\n"),
+            Some("Water Pollution".to_string())
         );
         assert_eq!(title_from_markdown("## Not a title\n\nNo h1 here.\n"), None);
     }
@@ -159,12 +159,12 @@ mod tests {
     #[test]
     fn derives_titles_from_file_stems() {
         assert_eq!(
-            title_from_stem("water_polution"),
-            Some("water polution".into())
+            title_from_stem("water_pollution"),
+            Some("water pollution".into())
         );
         assert_eq!(
-            title_from_stem("Water-Polution"),
-            Some("Water Polution".into())
+            title_from_stem("Water-Pollution"),
+            Some("Water Pollution".into())
         );
         assert_eq!(title_from_stem("---"), None);
     }

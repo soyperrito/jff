@@ -109,7 +109,7 @@ mod tests {
         let content = r#"
 # Water
 
-See [more:concept](../../concepts/w/water_polution.md) and [not related](x.md).
+See [more:concept](../../concepts/w/water_pollution.md) and [not related](x.md).
 Also [more:term](wt20261109123456).
 Short [more:t](jff:wt20261109123456) and [more:c](wc20261109123456).
 "#;
@@ -118,7 +118,7 @@ Short [more:t](jff:wt20261109123456) and [more:c](wc20261109123456).
 
         assert_eq!(links.len(), 4);
         assert_eq!(links[0].kind, Kind::Concept);
-        assert_eq!(links[0].dest, "../../concepts/w/water_polution.md");
+        assert_eq!(links[0].dest, "../../concepts/w/water_pollution.md");
         assert_eq!(links[1].kind, Kind::Term);
         assert_eq!(links[1].dest, "wt20261109123456");
         assert_eq!(links[2].kind, Kind::Term);

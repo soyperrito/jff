@@ -534,14 +534,14 @@ mod tests {
     #[test]
     fn creates_an_entry_and_markdown_file() {
         let (_directory, store) = store();
-        let entry = store.create(Kind::Term, "Water Polution").expect("create");
+        let entry = store.create(Kind::Term, "Water Pollution").expect("create");
 
-        assert_eq!(entry.title, "Water Polution");
+        assert_eq!(entry.title, "Water Pollution");
         assert_eq!(entry.kind, Kind::Term);
         assert_eq!(entry.letter, 'w');
         assert!(entry.reference.starts_with("wt"));
         assert!(entry.reference.len() == 16);
-        assert!(store.root().join("terms/w/water_polution.md").is_file());
+        assert!(store.root().join("terms/w/water_pollution.md").is_file());
 
         let registry = store.load().expect("registry");
         assert_eq!(registry.entries.len(), 1);
@@ -600,12 +600,12 @@ mod tests {
         let (_directory, store) = store();
         let water = store.create(Kind::Term, "Water").expect("term");
         let pollution = store
-            .create(Kind::Concept, "Water Polution")
+            .create(Kind::Concept, "Water Pollution")
             .expect("concept");
 
         let term_path = water.abs_path(store.root());
         let mut contents = store.content(&water).expect("content");
-        contents.push_str("\n[more:concept](../../concepts/w/water_polution.md)\n");
+        contents.push_str("\n[more:concept](../../concepts/w/water_pollution.md)\n");
         fs::write(&term_path, contents).expect("write link");
 
         let related = store.related(&water.reference).expect("related");
@@ -622,7 +622,7 @@ mod tests {
         let (_directory, store) = store();
         let water = store.create(Kind::Term, "Water").expect("term");
         let pollution = store
-            .create(Kind::Concept, "Water Polution")
+            .create(Kind::Concept, "Water Pollution")
             .expect("concept");
 
         let concept_path = pollution.abs_path(store.root());
@@ -630,7 +630,7 @@ mod tests {
 
         let term_path = water.abs_path(store.root());
         let mut contents = store.content(&water).expect("content");
-        contents.push_str("\n[more:concept](../../concepts/w/water_polution.md)\n");
+        contents.push_str("\n[more:concept](../../concepts/w/water_pollution.md)\n");
         fs::write(&term_path, contents).expect("append link");
 
         let related = store.related(&water.reference).expect("related");
@@ -639,7 +639,7 @@ mod tests {
         assert_eq!(related[0].heading.as_deref(), Some("Visible heading"));
         assert_eq!(
             related[0].target.as_ref().map(|entry| entry.title.as_str()),
-            Some("Water Polution")
+            Some("Water Pollution")
         );
     }
 
@@ -647,16 +647,16 @@ mod tests {
     fn imports_an_existing_markdown_file() {
         let (directory, store) = store();
         let source = directory.path().join("inbox/agua.md");
-        let contents = "---\ntitle: \"Water Polution\"\n---\n\n# Heading in body\n\nBody text.\n";
+        let contents = "---\ntitle: \"Water Pollution\"\n---\n\n# Heading in body\n\nBody text.\n";
 
         fs::create_dir_all(source.parent().unwrap()).expect("source dir");
         fs::write(&source, contents).expect("source file");
 
         let entry = store.create_from_file(Kind::Term, &source).expect("import");
 
-        assert_eq!(entry.title, "Water Polution");
+        assert_eq!(entry.title, "Water Pollution");
         assert_eq!(entry.letter, 'w');
-        assert_eq!(entry.path, "terms/w/water_polution.md");
+        assert_eq!(entry.path, "terms/w/water_pollution.md");
         assert_eq!(store.content(&entry).expect("content"), contents);
         assert!(source.is_file(), "the source must be copied, not moved");
     }

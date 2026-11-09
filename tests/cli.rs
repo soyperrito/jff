@@ -58,22 +58,22 @@ fn create_entry(home: &Path, kind: &str, title: &str) -> String {
 #[test]
 fn opens_an_existing_term_in_text_mode() {
     let home = TempDir::new().expect("temp dir");
-    let reference = create_entry(home.path(), "term", "Water Polution");
+    let reference = create_entry(home.path(), "term", "Water Pollution");
 
-    let stdout = ok(home.path(), &["-t", "water polution"]);
+    let stdout = ok(home.path(), &["-t", "water pollution"]);
 
-    assert!(stdout.contains("title: Water Polution"));
+    assert!(stdout.contains("title: Water Pollution"));
     assert!(stdout.contains(&reference));
-    assert!(stdout.contains("# Water Polution"));
+    assert!(stdout.contains("# Water Pollution"));
     assert_eq!(map(home.path())["entries"].as_array().unwrap().len(), 1);
 }
 
 #[test]
 fn imports_concepts_in_their_own_tree() {
     let home = TempDir::new().expect("temp dir");
-    let reference = create_entry(home.path(), "concept", "Water Polution");
+    let reference = create_entry(home.path(), "concept", "Water Pollution");
 
-    assert!(home.path().join("concepts/w/water_polution.md").is_file());
+    assert!(home.path().join("concepts/w/water_pollution.md").is_file());
 
     let map = map(home.path());
     assert_eq!(map["entries"][0]["kind"], "concept");
@@ -131,18 +131,18 @@ fn deletes_by_ref_and_removes_the_file() {
 fn follows_more_links_to_related_entries() {
     let home = TempDir::new().expect("temp dir");
     let term_reference = create_entry(home.path(), "term", "Water");
-    let concept_reference = create_entry(home.path(), "concept", "Water Polution");
+    let concept_reference = create_entry(home.path(), "concept", "Water Pollution");
 
     let term_path = home.path().join("terms/w/water.md");
     let mut contents = fs::read_to_string(&term_path).expect("term file");
-    contents.push_str("\n[more:concept](../../concepts/w/water_polution.md)\n");
+    contents.push_str("\n[more:concept](../../concepts/w/water_pollution.md)\n");
     fs::write(&term_path, contents).expect("append link");
 
     let stdout = ok(home.path(), &["-srt", "water"]);
 
     assert!(stdout.contains(&term_reference));
     assert!(stdout.contains(&concept_reference));
-    assert!(stdout.contains("Water Polution"));
+    assert!(stdout.contains("Water Pollution"));
 }
 
 #[test]
@@ -164,17 +164,17 @@ fn reports_missing_related_links() {
 fn related_list_prints_the_target_h1() {
     let home = TempDir::new().expect("temp dir");
     let term_reference = create_entry(home.path(), "term", "Water");
-    let concept_reference = create_entry(home.path(), "concept", "Water Polution");
+    let concept_reference = create_entry(home.path(), "concept", "Water Pollution");
 
     fs::write(
-        home.path().join("concepts/w/water_polution.md"),
+        home.path().join("concepts/w/water_pollution.md"),
         "# Displayed heading\n\nBody.\n",
     )
     .expect("rewrite concept");
 
     let term_path = home.path().join("terms/w/water.md");
     let mut contents = fs::read_to_string(&term_path).expect("term file");
-    contents.push_str("\n[more:concept](../../concepts/w/water_polution.md)\n");
+    contents.push_str("\n[more:concept](../../concepts/w/water_pollution.md)\n");
     fs::write(&term_path, contents).expect("append link");
 
     let stdout = ok(home.path(), &["-srt", "water"]);
@@ -182,7 +182,7 @@ fn related_list_prints_the_target_h1() {
     assert!(stdout.contains(&term_reference));
     assert!(stdout.contains(&concept_reference));
     assert!(stdout.contains("Displayed heading"));
-    assert!(!stdout.contains("Water Polution"));
+    assert!(!stdout.contains("Water Pollution"));
 }
 
 #[test]
@@ -190,7 +190,7 @@ fn related_accepts_short_more_aliases() {
     let home = TempDir::new().expect("temp dir");
     let water_reference = create_entry(home.path(), "term", "Water");
     let wine_reference = create_entry(home.path(), "term", "Wine");
-    let concept_reference = create_entry(home.path(), "concept", "Water Polution");
+    let concept_reference = create_entry(home.path(), "concept", "Water Pollution");
 
     let term_path = home.path().join("terms/w/water.md");
     let mut contents = fs::read_to_string(&term_path).expect("term file");
@@ -205,25 +205,25 @@ fn related_accepts_short_more_aliases() {
     assert!(stdout.contains(&wine_reference));
     assert!(stdout.contains(&concept_reference));
     assert!(stdout.contains("Wine"));
-    assert!(stdout.contains("Water Polution"));
+    assert!(stdout.contains("Water Pollution"));
 }
 
 #[test]
 fn non_interactive_list_falls_back_to_text() {
     let home = TempDir::new().expect("temp dir");
     let term_reference = create_entry(home.path(), "term", "Water");
-    let concept_reference = create_entry(home.path(), "concept", "Water Polution");
+    let concept_reference = create_entry(home.path(), "concept", "Water Pollution");
 
     let term_path = home.path().join("terms/w/water.md");
     let mut contents = fs::read_to_string(&term_path).expect("term file");
-    contents.push_str("\n[more:concept](../../concepts/w/water_polution.md)\n");
+    contents.push_str("\n[more:concept](../../concepts/w/water_pollution.md)\n");
     fs::write(&term_path, contents).expect("append link");
 
     let stdout = ok(home.path(), &["-l", "water"]);
 
     assert!(stdout.contains(&term_reference));
     assert!(stdout.contains(&concept_reference));
-    assert!(stdout.contains("Water Polution"));
+    assert!(stdout.contains("Water Pollution"));
 }
 
 #[test]
@@ -242,11 +242,11 @@ fn opens_a_term_by_ref_in_text_mode() {
 #[test]
 fn opens_a_concept_by_ref_in_text_mode() {
     let home = TempDir::new().expect("temp dir");
-    let reference = create_entry(home.path(), "concept", "Water Polution");
+    let reference = create_entry(home.path(), "concept", "Water Pollution");
 
     let stdout = ok(home.path(), &["-c", &reference]);
 
-    assert!(stdout.contains("title: Water Polution"));
+    assert!(stdout.contains("title: Water Pollution"));
     assert!(stdout.contains(&reference));
     assert!(stdout.contains("kind:  concept"));
 }
@@ -266,18 +266,18 @@ fn rejects_a_ref_with_the_wrong_kind() {
 fn list_accepts_a_ref_when_piped() {
     let home = TempDir::new().expect("temp dir");
     let term_reference = create_entry(home.path(), "term", "Water");
-    let concept_reference = create_entry(home.path(), "concept", "Water Polution");
+    let concept_reference = create_entry(home.path(), "concept", "Water Pollution");
 
     let term_path = home.path().join("terms/w/water.md");
     let mut contents = fs::read_to_string(&term_path).expect("term file");
-    contents.push_str("\n[more:concept](../../concepts/w/water_polution.md)\n");
+    contents.push_str("\n[more:concept](../../concepts/w/water_pollution.md)\n");
     fs::write(&term_path, contents).expect("append link");
 
     let stdout = ok(home.path(), &["-l", &term_reference]);
 
     assert!(stdout.contains(&term_reference));
     assert!(stdout.contains(&concept_reference));
-    assert!(stdout.contains("Water Polution"));
+    assert!(stdout.contains("Water Pollution"));
 }
 
 #[test]
@@ -307,9 +307,9 @@ fn opening_an_existing_term_does_not_duplicate_it() {
 #[test]
 fn opens_an_existing_concept_in_text_mode() {
     let home = TempDir::new().expect("temp dir");
-    let reference = create_entry(home.path(), "concept", "Water Polution");
+    let reference = create_entry(home.path(), "concept", "Water Pollution");
 
-    let stdout = ok(home.path(), &["-c", "water polution"]);
+    let stdout = ok(home.path(), &["-c", "water pollution"]);
 
     assert!(stdout.contains(&reference));
     assert!(stdout.contains("kind:  concept"));
@@ -349,15 +349,15 @@ fn config_init_is_idempotent() {
 fn list_can_filter_by_kind() {
     let home = TempDir::new().expect("temp dir");
     create_entry(home.path(), "term", "Water");
-    create_entry(home.path(), "concept", "Water Polution");
+    create_entry(home.path(), "concept", "Water Pollution");
 
     let terms = ok(home.path(), &["list", "--kind", "term"]);
     let concepts = ok(home.path(), &["list", "--kind", "concept"]);
 
     assert!(terms.contains("Water"));
-    assert!(!terms.contains("Water Polution"));
+    assert!(!terms.contains("Water Pollution"));
     assert!(!terms.contains("\tconcept\t"));
-    assert!(concepts.contains("Water Polution"));
+    assert!(concepts.contains("Water Pollution"));
     assert!(!concepts.contains("\tterm\t"));
 }
 

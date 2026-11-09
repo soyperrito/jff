@@ -32,7 +32,7 @@ cargo install --path .
 ```sh
 # Creation/import: use `create`
 jff create -t ./inbox/water.md
-jff create -c ./inbox/water_polution.md
+jff create -c ./inbox/water_pollution.md
 
 # Open an existing term/concept in the TUI
 jff -t "Water"
@@ -147,7 +147,7 @@ excluded, oversized or missing images are shown with an explanatory message.
 │       └── water.md
 └── concepts/
     └── w/
-        └── water_polution.md
+        └── water_pollution.md
 ```
 
 The home directory can be overridden with `JFF_HOME`, which is also used by the
@@ -197,7 +197,7 @@ concept:
 
 ```sh
 jff create -t ./inbox/water.md   # copies -> ~/.jff/terms/w/water.md
-jff create -c ./inbox/agua.md    # H1 "# Water pollution" -> concepts/w/water_polution.md
+jff create -c ./inbox/agua.md    # H1 "# Water pollution" -> concepts/w/water_pollution.md
 jff create -t ./inbox/wind.md    # missing -> creates ~/.jff/terms/w/wind.md
 ```
 
@@ -207,12 +207,12 @@ Markdown files can point to other entries with the original notation:
 
 ```markdown
 [more:term](../../terms/w/water.md)
-[more:concept](../../concepts/w/water_polution.md)
+[more:concept](../../concepts/w/water_pollution.md)
 [more:term](jff:wt20261109123456)
 [more:term](wt20261109123456)
 
 [more:t](../../terms/w/water.md)
-[more:c](../../concepts/w/water_polution.md)
+[more:c](../../concepts/w/water_pollution.md)
 [more:t](jff:wt20261109123456)
 [more:c](wc20261109123456)
 ```

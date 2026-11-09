@@ -91,7 +91,7 @@ Ejemplos:
 
 ```text
 wt20261109123456   term "Water"
-wc20261109123456   concept "Water Polution"
+wc20261109123456   concept "Water Pollution"
 ```
 
 Las refs de 14 caracteres del diseño original (`wt202610112211`) también se
@@ -111,7 +111,7 @@ aceptan al leer enlaces.
 │       └── water.md
 └── concepts/
     └── w/
-        └── water_polution.md
+        └── water_pollution.md
 ```
 
 `map.json` se escribe de forma atómica y protegido por un lock, para que dos
@@ -154,7 +154,7 @@ Si el archivo existe:
 ### 3.2 Crear un concepto desde un archivo
 
 ```sh
-jff create -c ./inbox/water_polution.md
+jff create -c ./inbox/water_pollution.md
 ```
 
 ### 3.3 Archivo que no existe
@@ -186,7 +186,7 @@ con:
 jff create -t ./notes/water.md
 
 # Importar un archivo con front matter
-jff create -c ./notes/polution.md
+jff create -c ./notes/pollution.md
 
 # Crear un término nuevo indicando solo el nombre del archivo
 jff create -t ./inbox/energy.md
@@ -218,9 +218,9 @@ jff --term "Water"
 ### 4.2 Abrir un concepto
 
 ```sh
-jff -c "Water Polution"
-jff concept "Water Polution"
-jff --concept "Water Polution"
+jff -c "Water Pollution"
+jff concept "Water Pollution"
+jff --concept "Water Pollution"
 ```
 
 ### 4.3 Abrir por ref
@@ -286,7 +286,7 @@ Ejemplos:
 
 ```sh
 jff find water
-jff find "water polution"
+jff find "water pollution"
 jff find water --kind term
 jff find water --kind concept
 jff find "water" --exact
@@ -298,7 +298,7 @@ Salida normal: una línea por entrada, separada por tabs:
 
 ```text
 wt20261109123456	term	Water
-wc20261109123456	concept	Water Polution
+wc20261109123456	concept	Water Pollution
 ```
 
 La búsqueda:
@@ -325,7 +325,7 @@ Salida normal: `ref`, `kind`, `title` separados por tabs.
 
 ```sh
 jff -set "water"                  # término exacto
-jff -sec "water polution"         # concepto exacto
+jff -sec "water pollution"         # concepto exacto
 jff -st "water"                   # buscar términos
 jff -sc "water"                   # buscar conceptos
 ```
@@ -347,7 +347,7 @@ Dentro de un Markdown puedes enlazar otras entradas:
 
 ```markdown
 [more:term](../../terms/w/water.md)
-[more:concept](../../concepts/w/water_polution.md)
+[more:concept](../../concepts/w/water_pollution.md)
 [more:term](jff:wt20261109123456)
 [more:concept](wc20261109123456)
 ```
@@ -356,7 +356,7 @@ También existen los alias cortos:
 
 ```markdown
 [more:t](../../terms/w/water.md)
-[more:c](../../concepts/w/water_polution.md)
+[more:c](../../concepts/w/water_pollution.md)
 [more:t](jff:wt20261109123456)
 [more:c](wc20261109123456)
 ```
@@ -385,7 +385,7 @@ Salida de texto:
 
 ```text
 Water (term, wt...)
-  Water contamination	wc...	concept	-> concepts/w/water_polution.md
+  Water contamination	wc...	concept	-> concepts/w/water_pollution.md
   [missing]	term	more:term	-> terms/w/missing.md
 ```
 
@@ -396,7 +396,7 @@ usa `-l`.
 
 ```sh
 jff -srt "water"                 # relacionados de un término
-jff -src "water polution"        # relacionados de un concepto
+jff -src "water pollution"        # relacionados de un concepto
 ```
 
 ---
@@ -668,10 +668,10 @@ jff: theme error: cannot read theme `.../themes/dracula.json`: No such file or d
 
 ```sh
 jff -t Water
-jff -c "Water Polution"
+jff -c "Water Pollution"
 jff -l Water
 jff term Water
-jff concept "Water Polution"
+jff concept "Water Pollution"
 ```
 
 ### 11.2 Teclas
@@ -765,7 +765,7 @@ jff -t Water > /tmp/water.txt
 ### 13.2 Buscar y filtrar
 
 ```sh
-jff find water | grep -i polution
+jff find water | grep -i pollution
 jff find water | awk -F '\t' '{print $1 "\t" $3}'
 jff list | cut -f1 | head -n 5
 jff list | wc -l
@@ -834,7 +834,7 @@ fi
     {
       "heading": "Water contamination",
       "link": {
-        "dest": "../../concepts/w/water_polution.md",
+        "dest": "../../concepts/w/water_pollution.md",
         "label": "more:concept",
         "type": "concept"
       },

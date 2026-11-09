@@ -220,12 +220,12 @@ mod tests {
         let store = Store::new(directory.path().join(".jff"));
         let water = store.create(Kind::Term, "Water").expect("term");
         let concept = store
-            .create(Kind::Concept, "Water Polution")
+            .create(Kind::Concept, "Water Pollution")
             .expect("concept");
 
         let term_path = water.abs_path(store.root());
         let mut contents = store.content(&water).expect("content");
-        contents.push_str("\n[more:concept](../../concepts/w/water_polution.md)\n");
+        contents.push_str("\n[more:concept](../../concepts/w/water_pollution.md)\n");
         fs::write(&term_path, contents).expect("link");
 
         let app = App::new(store, Config::default(), water.clone(), None);
