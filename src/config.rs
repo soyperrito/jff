@@ -38,15 +38,45 @@ impl Config {
         let path = config_path(root);
 
         match fs::read_to_string(&path) {
-            Ok(contents) => Ok(serde_json::from_str(&contents)?),
+            Ok(contents) => {
+                let mut config: Self = serde_json::from_str(&contents)?;
+                config.load_theme(root)?;
+                Ok(config)
+            }
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
             Err(err) => Err(err.into()),
         }
     }
 
+    /// Load the theme referenced by `colors.theme`. A theme completely replaces
+    /// the inline palette from `config.json`.
+    fn load_theme(&mut self, root: &Path) -> Result<()> {
+        let Some(theme) = self.colors.theme.clone() else {
+            return Ok(());
+        };
+        let path = resolve_theme_path(root, &theme);
+        let contents = fs::read_to_string(&path).map_err(|error| {
+            Error::Theme(format!("cannot read theme `{}`: {error}", path.display()))
+        })?;
+        let value: serde_json::Value = serde_json::from_str(&contents).map_err(|error| {
+            Error::Theme(format!(
+                "invalid JSON in theme `{}`: {error}",
+                path.display()
+            ))
+        })?;
+        let value = value.get("colors").cloned().unwrap_or(value);
+        let palette: ThemeColors = serde_json::from_value(value).map_err(|error| {
+            Error::Theme(format!("invalid theme `{}`: {error}", path.display()))
+        })?;
+
+        self.colors.palette = palette;
+        Ok(())
+    }
+
     /// Create the default config only when it does not exist yet.
     pub fn write_default(root: &Path) -> Result<bool> {
         fs::create_dir_all(root)?;
+        fs::create_dir_all(root.join("themes"))?;
         let path = config_path(root);
 
         if path.exists() {
@@ -56,6 +86,21 @@ impl Config {
         let contents = serde_json::to_string_pretty(&Self::default())?;
         fs::write(path, format!("{contents}\n"))?;
         Ok(true)
+    }
+}
+
+fn resolve_theme_path(root: &Path, theme: &Path) -> PathBuf {
+    if let Some(value) = theme.to_str()
+        && let Some(rest) = value.strip_prefix("~/")
+        && let Some(home) = BaseDirs::new()
+    {
+        return home.home_dir().join(rest);
+    }
+
+    if theme.is_absolute() {
+        theme.to_path_buf()
+    } else {
+        root.join(theme)
     }
 }
 
@@ -147,9 +192,19 @@ impl Default for Git {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Colors {
+    /// Optional path to a theme file. When set, its palette replaces all
+    /// inline colors below.
+    pub theme: Option<PathBuf>,
+    #[serde(flatten)]
+    pub palette: ThemeColors,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ThemeColors {
     pub title: String,
     pub text: String,
     pub muted: String,
@@ -167,7 +222,7 @@ pub struct Colors {
     pub scrollbar_thumb: String,
 }
 
-impl Default for Colors {
+impl Default for ThemeColors {
     fn default() -> Self {
         Self {
             title: "#FFFF00".to_string(),
@@ -278,9 +333,84 @@ mod tests {
         assert_eq!(config.git.token_env, "JFF_GIT_TOKEN");
         assert_eq!(config.images.max_size_kb, 10_240);
         assert_eq!(config.images.max_pixels, 40_000_000);
-        assert_eq!(config.colors.border, "#808080");
-        assert_eq!(config.colors.error, "#FF5555");
+        assert_eq!(config.colors.palette.border, "#808080");
+        assert_eq!(config.colors.palette.error, "#FF5555");
         assert!(config.images.enable);
+    }
+
+    #[test]
+    fn loads_a_theme_and_ignores_inline_colors() {
+        let directory = tempfile::TempDir::new().expect("temp dir");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("themes")).expect("themes dir");
+        std::fs::write(
+            root.join("themes/dracula.json"),
+            r##"{"title":"#BD93F9","border":"red"}"##,
+        )
+        .expect("theme");
+        std::fs::write(
+            root.join("config.json"),
+            r##"{"colors":{"theme":"themes/dracula.json","title":"#FFFFFF","border":"#000000"}}"##,
+        )
+        .expect("config");
+
+        let config = Config::load(root).expect("load config");
+
+        assert_eq!(
+            config.colors.theme.as_deref(),
+            Some(std::path::Path::new("themes/dracula.json"))
+        );
+        assert_eq!(config.colors.palette.title, "#BD93F9");
+        assert_eq!(config.colors.palette.border, "red");
+        assert_eq!(config.colors.palette.muted, "#808080");
+    }
+
+    #[test]
+    fn supports_themes_wrapped_in_a_colors_object() {
+        let directory = tempfile::TempDir::new().expect("temp dir");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("themes")).expect("themes dir");
+        std::fs::write(
+            root.join("themes/wrapped.json"),
+            r#"{"colors":{"title":"green","text":"white"}}"#,
+        )
+        .expect("theme");
+        std::fs::write(
+            root.join("config.json"),
+            r#"{"colors":{"theme":"themes/wrapped.json"}}"#,
+        )
+        .expect("config");
+
+        let config = Config::load(root).expect("load config");
+
+        assert_eq!(config.colors.palette.title, "green");
+        assert_eq!(config.colors.palette.text, "white");
+    }
+
+    #[test]
+    fn reports_a_missing_theme() {
+        let directory = tempfile::TempDir::new().expect("temp dir");
+        let root = directory.path();
+        std::fs::write(
+            root.join("config.json"),
+            r#"{"colors":{"theme":"themes/missing.json"}}"#,
+        )
+        .expect("config");
+
+        let error = Config::load(root).expect_err("missing theme must fail");
+
+        assert!(matches!(error, Error::Theme(_)));
+        assert!(error.to_string().contains("cannot read theme"));
+    }
+
+    #[test]
+    fn config_init_creates_the_themes_directory() {
+        let directory = tempfile::TempDir::new().expect("temp dir");
+
+        Config::write_default(directory.path()).expect("write config");
+
+        assert!(directory.path().join("themes").is_dir());
+        assert!(directory.path().join("config.json").is_file());
     }
 
     #[test]

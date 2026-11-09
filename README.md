@@ -102,10 +102,11 @@ viewer when stdout is a terminal. When piped, `-t`/`-c` print the full entry
 and `-l` prints the related list, so scripts keep working.
 
 The viewer renders headings, emphasis, lists, code blocks, quotes, tables,
-links and inline images. Colors and border style come from `config.json`.
-The content pane has a scrollbar on the right; the mouse wheel and keyboard
-both scroll it. The related pane displays the first H1 of each target file and
-can be navigated without leaving the viewer.
+links and inline images. Colors and border style come from `config.json`, or
+from a theme configured with `colors.theme`. The content pane has a scrollbar
+on the right; the mouse wheel and keyboard both scroll it. The related pane
+displays the first H1 of each target file and can be navigated without leaving
+the viewer.
 
 Images use the Kitty, Sixel or iTerm2 graphics protocol when the terminal
 supports one, and fall back to Unicode half-blocks otherwise. They are loaded
@@ -136,6 +137,8 @@ excluded, oversized or missing images are shown with an explanatory message.
 ├── config.json
 ├── map.json                     # canonical registry
 ├── .lock                        # inter-process write lock
+├── themes/
+│   └── dracula.json
 ├── terms/
 │   └── w/
 │       └── water.md
@@ -248,6 +251,7 @@ from the specification is accepted as an alias for `weight`.
     "token_env": "JFF_GIT_TOKEN"
   },
   "colors": {
+    "theme": null,
     "title": "#FFFF00",
     "text": "#FFFFFF",
     "muted": "#808080",
@@ -295,6 +299,42 @@ the terminal default:
 - `image`: image captions and scroll-to-view placeholders.
 - `highlight_fg` / `highlight_bg`: selected related row.
 - `scrollbar` / `scrollbar_thumb`: content scrollbar track and thumb.
+
+### Themes
+
+Set `colors.theme` to use a theme file instead of the inline colors:
+
+```json
+{
+  "colors": {
+    "theme": "themes/dracula.json"
+  }
+}
+```
+
+The file is expected at `~/.jff/themes/dracula.json`. Relative paths resolve
+from `~/.jff`; `~/...` and absolute paths are also accepted. When `theme` is
+set, **all inline color keys in `config.json` are ignored**, and missing theme
+keys fall back to the default palette. The file may be a flat palette:
+
+```json
+{
+  "title": "#BD93F9",
+  "text": "#F8F8F2",
+  "border": "#6272A4"
+}
+```
+
+or wrapped in a `colors` object. A complete Dracula example is included in the
+repository at `themes/dracula.json`:
+
+```sh
+mkdir -p ~/.jff/themes
+cp themes/dracula.json ~/.jff/themes/dracula.json
+```
+
+A missing or invalid theme is reported as an error. `jff config init` creates
+the `themes/` directory for convenience.
 
 ## Design notes and deviations from the original spec
 

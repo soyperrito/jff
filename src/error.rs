@@ -37,6 +37,9 @@ pub enum Error {
     #[error("editor exited with status {0}")]
     EditorFailed(String),
 
+    #[error("theme error: {0}")]
+    Theme(String),
+
     #[error("home directory could not be determined; set JFF_HOME")]
     NoHome,
 }

@@ -26,21 +26,21 @@ pub struct Theme {
 impl Theme {
     pub fn from_config(config: &Config) -> Self {
         Self {
-            title: parse_color(&config.colors.title, Color::LightYellow),
-            text: parse_color(&config.colors.text, Color::Reset),
-            muted: parse_color(&config.colors.muted, Color::DarkGray),
-            border: parse_color(&config.colors.border, Color::DarkGray),
-            accent: parse_color(&config.colors.accent, Color::Cyan),
-            related: parse_color(&config.colors.related, Color::Gray),
-            status: parse_color(&config.colors.status, Color::Cyan),
-            error: parse_color(&config.colors.error, Color::Red),
-            code: parse_color(&config.colors.code, Color::Gray),
-            code_bg: parse_color(&config.colors.code_bg, Color::Rgb(48, 48, 48)),
-            image: parse_color(&config.colors.image, Color::Gray),
-            highlight_fg: parse_color(&config.colors.highlight_fg, Color::White),
-            highlight_bg: parse_color(&config.colors.highlight_bg, Color::DarkGray),
-            scrollbar: parse_color(&config.colors.scrollbar, Color::DarkGray),
-            scrollbar_thumb: parse_color(&config.colors.scrollbar_thumb, Color::Cyan),
+            title: parse_color(&config.colors.palette.title, Color::LightYellow),
+            text: parse_color(&config.colors.palette.text, Color::Reset),
+            muted: parse_color(&config.colors.palette.muted, Color::DarkGray),
+            border: parse_color(&config.colors.palette.border, Color::DarkGray),
+            accent: parse_color(&config.colors.palette.accent, Color::Cyan),
+            related: parse_color(&config.colors.palette.related, Color::Gray),
+            status: parse_color(&config.colors.palette.status, Color::Cyan),
+            error: parse_color(&config.colors.palette.error, Color::Red),
+            code: parse_color(&config.colors.palette.code, Color::Gray),
+            code_bg: parse_color(&config.colors.palette.code_bg, Color::Rgb(48, 48, 48)),
+            image: parse_color(&config.colors.palette.image, Color::Gray),
+            highlight_fg: parse_color(&config.colors.palette.highlight_fg, Color::White),
+            highlight_bg: parse_color(&config.colors.palette.highlight_bg, Color::DarkGray),
+            scrollbar: parse_color(&config.colors.palette.scrollbar, Color::DarkGray),
+            scrollbar_thumb: parse_color(&config.colors.palette.scrollbar_thumb, Color::Cyan),
             border_type: match config.border_style.line.to_ascii_lowercase().as_str() {
                 "single" | "plain" => BorderType::Plain,
                 "rounded" => BorderType::Rounded,
@@ -99,9 +99,9 @@ mod tests {
     #[test]
     fn maps_every_configured_color() {
         let mut config = Config::default();
-        config.colors.title = "red".to_string();
-        config.colors.border = "#123456".to_string();
-        config.colors.scrollbar_thumb = "green".to_string();
+        config.colors.palette.title = "red".to_string();
+        config.colors.palette.border = "#123456".to_string();
+        config.colors.palette.scrollbar_thumb = "green".to_string();
 
         let theme = Theme::from_config(&config);
 
