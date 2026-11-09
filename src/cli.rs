@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
+use clap_complete::Shell;
 
 use crate::model::Kind;
 
@@ -120,6 +121,15 @@ pub enum Command {
 
     /// Commit and push the knowledge base
     Sync,
+
+    /// Generate shell completions
+    Completions {
+        #[arg(value_enum, value_name = "SHELL")]
+        shell: Shell,
+    },
+
+    /// Generate a man page on stdout
+    Man,
 
     /// Inspect or initialize configuration
     Config {

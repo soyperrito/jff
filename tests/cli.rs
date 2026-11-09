@@ -421,6 +421,26 @@ fn create_requires_exactly_one_kind_flag() {
 }
 
 #[test]
+fn generates_shell_completions() {
+    let home = TempDir::new().expect("temp dir");
+
+    let stdout = ok(home.path(), &["completions", "bash"]);
+
+    assert!(stdout.contains("_jff"));
+    assert!(stdout.contains("completions"));
+}
+
+#[test]
+fn generates_a_man_page() {
+    let home = TempDir::new().expect("temp dir");
+
+    let stdout = ok(home.path(), &["man"]);
+
+    assert!(stdout.contains(".TH jff"));
+    assert!(stdout.contains("SYNOPSIS"));
+}
+
+#[test]
 fn autopush_commits_to_a_local_remote() {
     let home = TempDir::new().expect("temp dir");
     let remote = home.path().join("remote.git");

@@ -58,6 +58,24 @@ fn install_broken_pipe_hook() {
 }
 
 fn run(cli: Cli) -> Result<ExitCode> {
+    match cli.command.as_ref() {
+        Some(CliCommand::Completions { shell }) => {
+            let mut command = Cli::command();
+            clap_complete::generate(*shell, &mut command, "jff", &mut std::io::stdout());
+            return Ok(ExitCode::SUCCESS);
+        }
+        Some(CliCommand::Man) => {
+            match clap_mangen::Man::new(Cli::command()).render(&mut std::io::stdout()) {
+                Ok(()) => return Ok(ExitCode::SUCCESS),
+                Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => {
+                    return Ok(ExitCode::SUCCESS);
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+        _ => {}
+    }
+
     let root = config::root()?;
     let store = Store::new(&root);
     let config = config::Config::load(&root)?;
@@ -109,6 +127,9 @@ fn run(cli: Cli) -> Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         Some(CliCommand::Sync) => sync_command(&store, &config),
+        Some(CliCommand::Completions { .. }) | Some(CliCommand::Man) => {
+            unreachable!("packaging commands are handled before loading the configuration")
+        }
         Some(CliCommand::Config { cmd }) => config_command(&store, cmd),
         None => {
             Cli::command().print_help()?;

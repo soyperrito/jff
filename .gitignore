@@ -1,4 +1,6 @@
 /target
+/completions
+/man
 *.swp
 *.swo
 .DS_Store

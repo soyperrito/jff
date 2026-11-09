@@ -37,6 +37,7 @@ TUI para leer, navegar y editar.
 16. [Solución de problemas](#16-solución-de-problemas)
 17. [Matemáticas y diagramas](#17-matemáticas-y-diagramas)
 18. [Git y sincronización](#18-git-y-sincronización)
+19. [Empaquetado y distribución](#19-empaquetado-y-distribución)
 
 ---
 
@@ -51,6 +52,9 @@ Requisitos:
 ```sh
 cargo build --release
 install -Dm755 target/release/jff ~/.local/bin/jff
+
+# binario + man page + completions
+make install
 
 # o
 cargo install --path .
@@ -1229,6 +1233,107 @@ git -C ~/.jff status
 git -C ~/.jff log --oneline
 git -C ~/.jff remote -v
 jff config show | jq '.git'
+```
+
+---
+
+## 19. Empaquetado y distribución
+
+### 19.1 Shell completions
+
+```sh
+jff completions bash > jff.bash
+jff completions zsh > _jff
+jff completions fish > jff.fish
+jff completions powershell > jff.ps1
+jff completions elvish > jff.elv
+```
+
+Instalación típica:
+
+```sh
+# Bash
+mkdir -p ~/.local/share/bash-completion/completions
+jff completions bash > ~/.local/share/bash-completion/completions/jff
+
+# Zsh
+mkdir -p ~/.local/share/zsh/site-functions
+jff completions zsh > ~/.local/share/zsh/site-functions/_jff
+
+# Fish
+mkdir -p ~/.config/fish/completions
+jff completions fish > ~/.config/fish/completions/jff.fish
+```
+
+### 19.2 Man page
+
+```sh
+jff man > jff.1
+man -l jff.1
+```
+
+Instalación:
+
+```sh
+sudo install -Dm644 jff.1 /usr/local/share/man/man1/jff.1
+sudo mandb
+```
+
+### 19.3 Makefile
+
+```sh
+make build        # cargo build --release --locked
+make test
+make fmt
+make clippy
+make completions  # genera completions/
+make man          # genera man/jff.1
+make install      # binario + man + completions
+make uninstall
+make clean
+```
+
+Variables:
+
+```sh
+make install PREFIX=/usr/local
+make install DESTDIR=/tmp/pkg
+```
+
+### 19.4 CI
+
+`.github/workflows/ci.yml` ejecuta en cada push/PR:
+
+- `cargo fmt --check`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo test --all-targets`
+- `cargo build --release --locked`
+- Smoke test de `completions` y `man`
+
+### 19.5 Releases
+
+Un tag `v*` dispara `.github/workflows/release.yml`, que compila y publica:
+
+- Linux x86_64
+- macOS ARM64
+- Windows x86_64
+
+Cada archivo incluye:
+
+- binario `jff`
+- `README.md`
+- `MANUAL.md`
+- `LICENSE`
+- `NOTICE`
+- completions de bash, zsh y fish
+- `man/jff.1`
+- directorio `themes/` con los temas incluidos
+
+Ejemplo:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 ---

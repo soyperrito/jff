@@ -7,8 +7,8 @@ knowledge base for terms and concepts.
 small JSON registry, and gives you fast exact, fuzzy and link-based search from
 the terminal.
 
-> Status: **MVP CLI + TUI (phases 0-3)**. Phase 4 (packaging) is still
-> pending.
+> Status: **MVP CLI + TUI, phases 0-4 complete**. Development builds and
+> release packaging are configured in CI.
 
 Full command reference, themes, images and pipe examples:
 [MANUAL.md](MANUAL.md).
@@ -25,8 +25,20 @@ Full command reference, themes, images and pipe examples:
 cargo build --release
 install -Dm755 target/release/jff ~/.local/bin/jff
 
+# or install binary, man page and completions
+make install
+
 # or
 cargo install --path .
+```
+
+Generate packaging artifacts explicitly:
+
+```sh
+jff completions bash > jff.bash
+jff completions zsh > _jff
+jff completions fish > jff.fish
+jff man > jff.1
 ```
 
 ## Quick start
@@ -94,6 +106,8 @@ jff related <QUERY> [--kind ...] [--json]
 jff delete <REF>
 jff edit <REF> [--editor nano|vim|code|emacs|custom]
 jff sync
+jff completions bash|zsh|fish|powershell|elvish
+jff man
 jff config path|init|show
 ```
 
@@ -464,7 +478,25 @@ inline with the image support. Otherwise the diagram source is shown with the
 3. ✅ **Phase 3 — Rich content and Git:** LaTeX/Typst math to Unicode,
    Mermaid/Graphviz/Typst diagrams with optional external renderers, Git
    autopush and rebase conflict handling.
-4. **Phase 4 — Packaging:** shell completions, man page, CI, releases.
+4. ✅ **Phase 4 — Packaging:** shell completions, man page, Makefile, CI and
+   tag-based releases for Linux, macOS and Windows.
+
+## Packaging
+
+- `jff completions <shell>` writes a completion script for `bash`, `zsh`,
+  `fish`, `powershell` or `elvish`.
+- `jff man` writes a roff man page.
+- `make install` installs the binary, man page and bash/zsh/fish completions.
+- `make completions man` generates the artifacts under `completions/` and
+  `man/`.
+
+CI lives in `.github/workflows/ci.yml` and runs format, Clippy, tests, release
+build and packaging smoke tests.
+
+Pushing a tag such as `v0.1.0` triggers `.github/workflows/release.yml`, which
+builds Linux x86_64, macOS ARM64 and Windows x86_64 archives. Each archive
+contains the binary, `README.md`, `MANUAL.md`, `LICENSE`, `NOTICE`,
+completions, the man page and the sample `themes/` directory.
 
 ## Development
 
@@ -477,8 +509,8 @@ cargo test
 The test suite covers ref generation, slug/normalization, link extraction and
 path-traversal protection, registry CRUD, atomic file creation, legacy CLI
 aliases, search, related links, editor launching, the Markdown renderer,
-LaTeX-to-Unicode math, diagram parsing, image resolution/limits, Git sync and
-TUI navigation state.
+LaTeX-to-Unicode math, diagram parsing, image resolution/limits, Git sync,
+completions, man-page generation and TUI navigation state.
 
 ## Maintainer
 

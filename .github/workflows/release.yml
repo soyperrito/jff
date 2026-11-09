@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          name="jff-${version}-${{ matrix.target }}"
+          mkdir -p "$name/completions" "$name/man"
+          cp "target/${{ matrix.target }}/release/jff" "$name/"
+          cp README.md MANUAL.md LICENSE NOTICE "$name/"
+          cp -r themes "$name/themes"
+          "target/${{ matrix.target }}/release/jff" completions bash > "$name/completions/jff.bash"
+          "target/${{ matrix.target }}/release/jff" completions zsh > "$name/completions/_jff"
+          "target/${{ matrix.target }}/release/jff" completions fish > "$name/completions/jff.fish"
+          "target/${{ matrix.target }}/release/jff" man > "$name/man/jff.1"
+          tar -czf "$name.tar.gz" "$name"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v',''
+          $name = "jff-$version-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path "$name/completions", "$name/man" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/jff.exe" "$name/"
+          Copy-Item -Path README.md, MANUAL.md, LICENSE, NOTICE -Destination "$name/"
+          New-Item -ItemType Directory -Force -Path "$name/themes" | Out-Null
+          Copy-Item -Path "themes\*" -Destination "$name/themes" -Recurse
+          & "target/${{ matrix.target }}/release/jff.exe" completions bash | Out-File -Encoding utf8 "$name/completions/jff.bash"
+          & "target/${{ matrix.target }}/release/jff.exe" completions zsh | Out-File -Encoding utf8 "$name/completions/_jff"
+          & "target/${{ matrix.target }}/release/jff.exe" completions fish | Out-File -Encoding utf8 "$name/completions/jff.fish"
+          & "target/${{ matrix.target }}/release/jff.exe" man | Out-File -Encoding utf8 "$name/man/jff.1"
+          Compress-Archive -Path $name -DestinationPath "$name.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            jff-*.tar.gz
+            jff-*.zip
+          if-no-files-found: ignore
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
