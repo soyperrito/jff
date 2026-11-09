@@ -138,6 +138,13 @@ impl App {
         true
     }
 
+    pub fn first_image(&self) -> Option<markdown::ImageRef> {
+        self.rendered.blocks.iter().find_map(|block| match block {
+            markdown::Block::Image(image) => Some(image.clone()),
+            _ => None,
+        })
+    }
+
     pub fn open_selected(&mut self) {
         let Some(item) = self.related.get(self.selected) else {
             return;

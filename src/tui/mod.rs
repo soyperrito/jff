@@ -63,6 +63,29 @@ pub fn run(store: Store, config: Config, entry: Entry) -> Result<()> {
                         Err(error) => app.status = Some(format!("editor: {error}")),
                     }
                 }
+                Outcome::OpenImage => {
+                    let Some(image) = app.first_image() else {
+                        app.status = Some("no image in this entry".to_string());
+                        continue;
+                    };
+
+                    let root = app.store.root().to_path_buf();
+                    let entry_path = app.current.abs_path(&root);
+                    let base_dir = entry_path.parent().unwrap_or(root.as_path()).to_path_buf();
+
+                    let Some(images) = app.images.as_ref() else {
+                        app.status = Some("images are disabled in config".to_string());
+                        continue;
+                    };
+
+                    match images.resolve(&root, &base_dir, &image.dest) {
+                        Ok(path) => match crate::opener::open_image(&path, &app.config) {
+                            Ok(()) => app.status = Some("opened image externally".to_string()),
+                            Err(error) => app.status = Some(format!("opener: {error}")),
+                        },
+                        Err(error) => app.status = Some(format!("image: {error}")),
+                    }
+                }
                 Outcome::Continue => {}
             },
             Event::Mouse(mouse) => handle_mouse(&mut app, mouse),
@@ -77,6 +100,7 @@ enum Outcome {
     Continue,
     Quit,
     Edit,
+    OpenImage,
 }
 
 fn handle_key(app: &mut App, key: KeyEvent) -> Outcome {
@@ -88,13 +112,14 @@ fn handle_key(app: &mut App, key: KeyEvent) -> Outcome {
         KeyCode::Char('c') if control => return Outcome::Quit,
         KeyCode::Char('q') => return Outcome::Quit,
         KeyCode::Char('e') => return Outcome::Edit,
+        KeyCode::Char('o') => return Outcome::OpenImage,
         KeyCode::Char('r') => {
             app.reload();
             return Outcome::Continue;
         }
         KeyCode::Char('?') => {
             app.status = Some(
-                "Tab: focus · j/k or arrows: move · Enter: open · e: edit · r: reload · ←/Ctrl+←: back · q: quit"
+                "Tab: focus · j/k or arrows: move · Enter: open · e: edit · o: open image · r: reload · ←/Ctrl+←: back · q: quit"
                     .to_string(),
             );
             return Outcome::Continue;

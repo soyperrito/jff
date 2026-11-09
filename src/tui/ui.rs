@@ -246,7 +246,8 @@ fn content_layout(app: &App, width: u16, max_height: u16) -> Vec<LayoutEntry> {
                     top = top.saturating_add(1);
                 }
 
-                let height = image_block_height(width, max_height, app.images.is_some());
+                let limit = image_limit(top, max_height);
+                let height = image_block_height(width, limit, app.images.is_some());
                 layout.push(LayoutEntry { index, top, height });
                 top = top.saturating_add(height).saturating_add(1);
             }
@@ -257,7 +258,7 @@ fn content_layout(app: &App, width: u16, max_height: u16) -> Vec<LayoutEntry> {
 
                 let can_render = app.diagrams.supports(&diagram.language) && app.images.is_some();
                 let height = if can_render {
-                    image_block_height(width, max_height, true)
+                    image_block_height(width, image_limit(top, max_height), true)
                 } else {
                     let lines = diagram_source_lines(diagram, &app.theme, None);
                     text_height(&lines, width).min(max_height).max(1)
@@ -281,6 +282,16 @@ fn text_height(lines: &[Line<'static>], width: u16) -> u16 {
     paragraph.line_count(width).min(u16::MAX as usize) as u16
 }
 
+fn image_limit(top: u16, max_height: u16) -> u16 {
+    let remaining = max_height.saturating_sub(top);
+
+    if top <= max_height / 2 && remaining >= 12 {
+        remaining
+    } else {
+        24.min(max_height).max(2)
+    }
+}
+
 fn image_block_height(width: u16, max_height: u16, enabled: bool) -> u16 {
     if !enabled {
         return 2.min(max_height);
@@ -290,9 +301,8 @@ fn image_block_height(width: u16, max_height: u16, enabled: bool) -> u16 {
         return max_height;
     }
 
-    let rows = (u32::from(width) / 3)
-        .clamp(8, 24)
-        .min(u32::from(max_height.saturating_sub(1))) as u16;
+    let max_rows = max_height.saturating_sub(1).max(1) as u32;
+    let rows = (u32::from(width) / 2).max(8).min(max_rows) as u16;
     rows + 1
 }
 
@@ -352,7 +362,7 @@ fn draw_image(frame: &mut Frame, app: &mut App, image: &ImageRef, area: Rect, fu
         Ok(())
     } else if images.uses_quadrants() {
         match images.quadrants(&path, image_area.width, image_area.height) {
-            Ok(bitmap) => {
+            Ok((bitmap, _, _)) => {
                 draw_quadrants(frame.buffer_mut(), image_area, bitmap);
                 Ok(())
             }
@@ -601,7 +611,8 @@ fn draw_footer(frame: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     } else {
         Style::default()
     };
-    let keys = "Tab focus · ↑↓/jk move · Enter open · e edit · r reload · ←/Esc back · q quit";
+    let keys =
+        "Tab focus · ↑↓/jk move · Enter open · e edit · o image · r reload · ←/Esc back · q quit";
 
     frame.render_widget(
         Paragraph::new(vec![

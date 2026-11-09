@@ -154,6 +154,7 @@ Keys:
 | `←` / `h`, `Ctrl+←` / `Alt+←` | back in history |
 | `Esc` / `Backspace` | back; quit at the root |
 | `e` | edit |
+| `o` | open the first image with an external viewer |
 | `r` | reload |
 | `q` | quit |
 | `?` | key help |
@@ -223,6 +224,10 @@ Values: `auto`, `halfblocks`, `quadrants`, `kitty`, `sixel`, `iterm2`. The
 half-blocks/quadrants fallback is intentionally low-resolution; choosing a
 graphics-capable terminal is the only way to get full image quality.
 
+Press `o` in the viewer to open the first image with an external viewer. By
+default `jff` uses `xdg-open` (Linux), `open` (macOS) or `start` (Windows); set
+`images.opener` to a custom command if needed.
+
 Math:
 
 ```markdown
@@ -255,6 +260,7 @@ effective configuration. A minimal example:
   "images": {
     "enable": true,
     "protocol": "auto",
+    "opener": null,
     "mime": ["jpg", "jpeg", "png"],
     "exclude": ["gif", "webp"],
     "max_size_kb": 10240,

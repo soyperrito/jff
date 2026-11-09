@@ -30,7 +30,7 @@ pub struct ImageManager {
     config: Images,
     cache: HashMap<PathBuf, CachedImage>,
     image_cache: HashMap<PathBuf, Result<DynamicImage, String>>,
-    quadrant_cache: HashMap<(PathBuf, u16, u16), RgbaImage>,
+    quadrant_cache: HashMap<(PathBuf, u16, u16), (RgbaImage, u16, u16)>,
     force_quadrants: bool,
 }
 
@@ -69,25 +69,37 @@ impl ImageManager {
         path: &Path,
         width: u16,
         height: u16,
-    ) -> Result<&RgbaImage, String> {
+    ) -> Result<(&RgbaImage, u16, u16), String> {
         let key = (path.to_path_buf(), width, height);
 
         if !self.quadrant_cache.contains_key(&key) {
-            let target_width = u32::from(width).saturating_mul(2).max(1);
-            let target_height = u32::from(height).saturating_mul(2).max(1);
-            let resized = self
-                .dynamic(path)?
+            let max_width = u32::from(width).saturating_mul(2).max(2);
+            let max_height = u32::from(height).saturating_mul(2).max(2);
+            let source = self.dynamic(path)?;
+            let source_width = source.width().max(1) as f64;
+            let source_height = source.height().max(1) as f64;
+            let scale =
+                (f64::from(max_width) / source_width).min(f64::from(max_height) / source_height);
+            let target_width = ((source_width * scale).floor() as u32).max(2);
+            let target_height = ((source_height * scale).floor() as u32).max(2);
+            let cell_width = (target_width / 2).max(1) as u16;
+            let cell_height = (target_height / 2).max(1) as u16;
+            let pixel_width = u32::from(cell_width) * 2;
+            let pixel_height = u32::from(cell_height) * 2;
+            let resized = source
                 .resize_exact(
-                    target_width,
-                    target_height,
+                    pixel_width,
+                    pixel_height,
                     image::imageops::FilterType::Lanczos3,
                 )
                 .to_rgba8();
-            self.quadrant_cache.insert(key.clone(), resized);
+
+            self.quadrant_cache
+                .insert(key.clone(), (resized, cell_width, cell_height));
         }
 
         match self.quadrant_cache.get(&key) {
-            Some(image) => Ok(image),
+            Some((image, cell_width, cell_height)) => Ok((image, *cell_width, *cell_height)),
             None => Err("quadrant image is not available".to_string()),
         }
     }
@@ -312,28 +324,44 @@ fn list_contains(list: &[String], extension: &str) -> bool {
     })
 }
 
-/// Draw a pre-resized RGBA image using 2x2 Unicode quadrants.
+/// Draw a pre-resized RGBA image using 2x2 Unicode quadrants, preserving its
+/// aspect ratio and centering it inside `area`.
 pub(crate) fn draw_quadrants(buffer: &mut Buffer, area: Rect, image: &RgbaImage) {
-    let needed_width = u32::from(area.width) * 2;
-    let needed_height = u32::from(area.height) * 2;
-
-    if image.width() < needed_width || image.height() < needed_height {
+    if area.width == 0 || area.height == 0 {
         return;
     }
 
-    for y in 0..area.height {
-        for x in 0..area.width {
-            let left = u32::from(x) * 2;
-            let top = u32::from(y) * 2;
+    for y in area.y..area.y.saturating_add(area.height) {
+        for x in area.x..area.x.saturating_add(area.width) {
+            if let Some(cell) = buffer.cell_mut((x, y)) {
+                cell.set_char(' ').set_fg(Color::Reset).set_bg(Color::Reset);
+            }
+        }
+    }
+
+    let cell_width = (image.width() / 2).min(u32::from(area.width)) as u16;
+    let cell_height = (image.height() / 2).min(u32::from(area.height)) as u16;
+
+    if cell_width == 0 || cell_height == 0 {
+        return;
+    }
+
+    let left = area.x + (area.width - cell_width) / 2;
+    let top = area.y + (area.height - cell_height) / 2;
+
+    for y in 0..cell_height {
+        for x in 0..cell_width {
+            let image_x = u32::from(x) * 2;
+            let image_y = u32::from(y) * 2;
             let pixels = [
-                rgba(image.get_pixel(left, top)),
-                rgba(image.get_pixel(left + 1, top)),
-                rgba(image.get_pixel(left, top + 1)),
-                rgba(image.get_pixel(left + 1, top + 1)),
+                rgba(image.get_pixel(image_x, image_y)),
+                rgba(image.get_pixel(image_x + 1, image_y)),
+                rgba(image.get_pixel(image_x, image_y + 1)),
+                rgba(image.get_pixel(image_x + 1, image_y + 1)),
             ];
             let (character, foreground, background) = quadrant_cell(pixels);
 
-            if let Some(cell) = buffer.cell_mut((area.x + x, area.y + y)) {
+            if let Some(cell) = buffer.cell_mut((left + x, top + y)) {
                 cell.set_char(character)
                     .set_fg(foreground)
                     .set_bg(background);
@@ -532,6 +560,23 @@ mod tests {
         assert_eq!(character, '█');
         assert_eq!(foreground, Color::Rgb(255, 0, 0));
         assert_eq!(background, Color::Rgb(255, 0, 0));
+    }
+
+    #[test]
+    fn quadrant_render_preserves_aspect_ratio() {
+        let directory = TempDir::new().expect("temp dir");
+        let root = directory.path();
+        let path = root.join("wide.png");
+        write_png(&path, 4, 2);
+
+        let mut manager = ImageManager::halfblocks(&Images::default());
+        let resolved = manager
+            .resolve(root, root, "wide.png")
+            .expect("resolve image");
+        let (image, width, height) = manager.quadrants(&resolved, 10, 10).expect("quadrants");
+
+        assert_eq!((width, height), (10, 5));
+        assert_eq!((image.width(), image.height()), (20, 10));
     }
 
     #[test]

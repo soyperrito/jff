@@ -37,6 +37,9 @@ pub enum Error {
     #[error("editor exited with status {0}")]
     EditorFailed(String),
 
+    #[error("cannot open image: {0}")]
+    Opener(String),
+
     #[error("theme error: {0}")]
     Theme(String),
 

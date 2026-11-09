@@ -127,6 +127,8 @@ pub struct Images {
     /// `auto`, `halfblocks`, `kitty`, `sixel` or `iterm2`.
     #[serde(default = "default_image_protocol")]
     pub protocol: String,
+    /// Optional external image viewer command. Empty/None uses the platform default.
+    pub opener: Option<String>,
     #[serde(default = "default_image_mime", deserialize_with = "string_or_vec")]
     pub mime: Vec<String>,
     #[serde(default = "default_image_exclude", deserialize_with = "string_or_vec")]
@@ -144,6 +146,7 @@ impl Default for Images {
         Self {
             enable: true,
             protocol: default_image_protocol(),
+            opener: None,
             mime: default_image_mime(),
             exclude: default_image_exclude(),
             max_size_kb: default_max_image_kb(),
@@ -348,6 +351,7 @@ mod tests {
         assert_eq!(config.images.max_size_kb, 10_240);
         assert_eq!(config.images.max_pixels, 40_000_000);
         assert_eq!(config.images.protocol, "auto");
+        assert!(config.images.opener.is_none());
         assert_eq!(config.colors.palette.border, "#808080");
         assert_eq!(config.colors.palette.error, "#FF5555");
         assert!(config.images.enable);

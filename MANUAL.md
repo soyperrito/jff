@@ -523,6 +523,7 @@ jff config show       # imprime la configuración efectiva, con tema aplicado
   "images": {
     "enable": true,
     "protocol": "auto",
+    "opener": null,
     "mime": ["jpg", "jpeg", "png"],
     "exclude": ["gif", "webp"],
     "max_size_kb": 10240,
@@ -739,6 +740,7 @@ jff concept "Water Pollution"
 | `Enter` | enfocar relacionados o abrir el seleccionado |
 | `←` / `h`, `Ctrl+←` / `Alt+←` | volver en el historial |
 | `e` | editar con el editor configurado |
+| `o` | abrir la primera imagen en un visor externo |
 | `r` | recargar la entrada |
 | `Esc` / `Backspace` | volver; salir en la raíz |
 | `q` | salir |
@@ -777,6 +779,12 @@ Reglas:
   { "images": { "protocol": "kitty" } }
   ```
   Valores: `auto`, `halfblocks`, `quadrants`, `kitty`, `sixel`, `iterm2`.
+- Pulsa `o` en la TUI para abrir la primera imagen en un visor externo. Por
+  defecto se usa `xdg-open`/`open`/`start`; se puede configurar
+  `images.opener`:
+  ```json
+  { "images": { "opener": "feh" } }
+  ```
 - Los tipos permitidos y excluidos se configuran en `images.mime` y
   `images.exclude`.
 - Límites:
