@@ -105,7 +105,8 @@ jff find <QUERY> [--kind ...] [--exact] [--json]
 jff related <QUERY> [--kind ...] [--json]
 jff delete <REF>
 jff edit <REF> [--editor nano|vim|code|emacs|custom]
-jff sync
+jff load
+jff backup
 jff completions bash|zsh|fish|powershell|elvish
 jff man
 jff config path|init|show
@@ -304,7 +305,8 @@ from the specification is accepted as an alias for `weight`.
 ```
 
 Git credentials are **not** stored in the config: `token_env` names the
-environment variable that will hold the token once Git sync is implemented.
+environment variable that will hold the token used by `jff backup` and
+`jff load`.
 
 To use a theme, replace the whole `colors` block with
 `{ "theme": "themes/dracula.json" }`. Inline color keys are then ignored
@@ -407,7 +409,7 @@ the diagram is rendered to a PNG under `~/.jff/.cache/diagrams/` and displayed
 inline with the image support. Otherwise the diagram source is shown with the
 `diagram` and `code` colors, so the note remains readable.
 
-## Git sync
+## Git backup and load
 
 ```json
 {
@@ -421,16 +423,22 @@ inline with the image support. Otherwise the diagram source is shown with the
 }
 ```
 
-- `jff sync` initializes `~/.jff` as a Git repository, commits pending changes
-  and pushes to `origin`.
-- With `autopush: true`, the same happens automatically after `create`,
+- `jff backup` initializes `~/.jff` as a Git repository, commits pending
+  changes and pushes to `origin`.
+- `jff load` loads `map.json`, `terms/` and `concepts/` from the configured
+  remote. If `~/.jff` is already a repository it fetches and rebases; if not,
+  it clones to a temporary directory and copies those paths into the store.
+  Local data is backed up to `.cache/load-backup-<timestamp>/` before a
+  first-time clone replaces it. Local `config.json` and `themes/` are
+  preserved.
+- With `autopush: true`, `jff backup` runs automatically after `create`,
   `delete` and `edit`.
 - The generated `.gitignore` excludes `.lock`, `.cache/` and `*.tmp`.
 - `token_env` names the environment variable containing an HTTPS token.
   Credentials are never read from `config.json`.
-- Synchronization performs `fetch` + `pull --rebase --autostash` before
-  pushing. If a rebase conflict occurs, it is aborted and a clear error is
-  returned. Resolve it manually:
+- Backup performs `fetch` + `pull --rebase --autostash` before pushing. If a
+  rebase conflict occurs, it is aborted and a clear error is returned. Resolve
+  it manually:
 
   ```sh
   cd ~/.jff
@@ -438,9 +446,11 @@ inline with the image support. Otherwise the diagram source is shown with the
   # resolver conflictos
   git add <archivos>
   git rebase --continue
-  jff sync
+  jff backup
   ```
-- The first sync to an empty remote creates the `main` branch.
+- The first backup to an empty remote creates the `main` branch.
+- `jff load` refuses to pull when `map.json`, `terms/` or `concepts/` have
+  tracked local changes; run `jff backup` first.
 
 ## Design notes and deviations from the original spec
 
@@ -509,8 +519,8 @@ cargo test
 The test suite covers ref generation, slug/normalization, link extraction and
 path-traversal protection, registry CRUD, atomic file creation, legacy CLI
 aliases, search, related links, editor launching, the Markdown renderer,
-LaTeX-to-Unicode math, diagram parsing, image resolution/limits, Git sync,
-completions, man-page generation and TUI navigation state.
+LaTeX-to-Unicode math, diagram parsing, image resolution/limits, Git
+backup/load, completions, man-page generation and TUI navigation state.
 
 ## Maintainer
 

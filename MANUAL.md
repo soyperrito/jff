@@ -36,7 +36,7 @@ TUI para leer, navegar y editar.
 15. [Alias legacy](#15-alias-legacy)
 16. [Solución de problemas](#16-solución-de-problemas)
 17. [Matemáticas y diagramas](#17-matemáticas-y-diagramas)
-18. [Git y sincronización](#18-git-y-sincronización)
+18. [Git, backup y load](#18-git-backup-y-load)
 19. [Empaquetado y distribución](#19-empaquetado-y-distribución)
 
 ---
@@ -1047,7 +1047,7 @@ jff edit <ref> --editor custom
 jff -eo <ref>
 ```
 
-### Git no sincroniza
+### Git no respalda o carga
 
 Comprueba:
 
@@ -1060,9 +1060,10 @@ git -C ~/.jff remote -v
 - `git.repo` debe estar configurado.
 - Si usas HTTPS, exporta `JFF_GIT_TOKEN` o el nombre configurado en
   `token_env`.
-- Si hay conflicto, sigue los pasos de la sección 18.4.
-- Un fallo de autopush no pierde cambios locales; ejecuta `jff sync` después
+- Si hay conflicto, sigue los pasos de la sección 18.5.
+- Un fallo de autopush no pierde cambios locales; ejecuta `jff backup` después
   de corregir el problema.
+- Para traer datos remotos, usa `jff load`.
 
 ### Una fórmula no se ve bien
 
@@ -1150,7 +1151,7 @@ command -v typst
 
 ---
 
-## 18. Git y sincronización
+## 18. Git, backup y load
 
 ### 18.1 Configuración
 
@@ -1167,20 +1168,20 @@ command -v typst
 ```
 
 - `repo`: URL del remoto.
-- `autopush`: sincroniza automáticamente después de `create`, `delete` y
-  `edit`.
+- `autopush`: ejecuta `jff backup` automáticamente después de `create`,
+  `delete` y `edit`.
 - `user` / `email`: identidad usada en los commits.
 - `token_env`: nombre de la variable de entorno que contiene el token HTTPS.
   La contraseña/token **no** se guarda en `config.json`.
 
-### 18.2 Sincronización manual
+### 18.2 Backup manual
 
 ```sh
 export JFF_GIT_TOKEN="tu_token"
-jff sync
+jff backup
 ```
 
-`jff sync`:
+`jff backup`:
 
 1. Inicializa `~/.jff` como repositorio Git si hace falta.
 2. Configura `origin`.
@@ -1190,24 +1191,57 @@ jff sync
 6. Hace `fetch` y `pull --rebase --autostash`.
 7. Hace `push` a `origin`.
 
-La primera sincronización contra un remoto vacío crea la rama `main`.
+El primer backup contra un remoto vacío crea la rama `main`.
 
 ### 18.3 Autopush
 
-Con `"autopush": true`, `jff` sincroniza después de:
+Con `"autopush": true`, `jff` ejecuta un backup después de:
 
 ```sh
 jff create -t archivo.md
 jff create -c archivo.md
 jff delete <ref>
 jff edit <ref>
-jff -t Water        # edición desde la TUI: suspende, edita y sincroniza
+jff -t Water        # edición desde la TUI: suspende, edita y respalda
 ```
 
 Si el autopush falla, la operación local no se pierde: se muestra una
-advertencia y el cambio queda en el store para el siguiente `jff sync`.
+advertencia y el cambio queda en el store para el siguiente `jff backup`.
 
-### 18.4 Conflictos
+### 18.4 Load desde el remoto
+
+```sh
+jff load
+```
+
+`jff load` carga desde `git.repo` los archivos:
+
+- `map.json`
+- `terms/`
+- `concepts/`
+
+Comportamiento:
+
+- Si `~/.jff` ya es un repositorio Git:
+  - Hace `fetch` y `pull --rebase`.
+  - Se niega a continuar si `map.json`, `terms/` o `concepts/` tienen cambios
+    tracked sin respaldar; ejecuta antes `jff backup`.
+  - Si hay conflicto, aborta el rebase y devuelve error.
+- Si `~/.jff` no es un repositorio Git:
+  - Clona el remoto en un directorio temporal.
+  - Exige que el remoto contenga `map.json`.
+  - Copia el contenido local de `map.json`, `terms/`, `concepts/`,
+    `config.json` y `themes/` a
+    `~/.jff/.cache/load-backup-<timestamp>/`.
+  - Reemplaza `map.json`, `terms/` y `concepts/` con los del remoto.
+  - Copia el `.git` del clon para que los siguientes backups sigan la misma
+    historia.
+  - Restaura `config.json` y `themes/` locales para no perder la configuración
+    ni los temas instalados.
+  - Crea `terms/` y `concepts/` si no existen.
+- El comando imprime la ruta del backup local si se creó uno.
+
+### 18.5 Conflictos del backup
 
 Antes de hacer push se ejecuta un rebase sobre el remoto. Si hay conflicto:
 
@@ -1223,10 +1257,10 @@ git pull --rebase origin main
 # resolver archivos en conflicto
 git add <archivos>
 git rebase --continue
-jff sync
+jff backup
 ```
 
-### 18.5 Inspección
+### 18.6 Inspección
 
 ```sh
 git -C ~/.jff status

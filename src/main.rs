@@ -126,7 +126,8 @@ fn run(cli: Cli) -> Result<ExitCode> {
             autopush_or_warn(store.root(), &config, &format!("edit {}", entry.reference));
             Ok(ExitCode::SUCCESS)
         }
-        Some(CliCommand::Sync) => sync_command(&store, &config),
+        Some(CliCommand::Backup) => backup_command(&store, &config),
+        Some(CliCommand::Load) => load_command(&store, &config),
         Some(CliCommand::Completions { .. }) | Some(CliCommand::Man) => {
             unreachable!("packaging commands are handled before loading the configuration")
         }
@@ -357,9 +358,20 @@ fn delete(store: &Store, config: &config::Config, reference: &str) -> Result<Exi
     Ok(ExitCode::SUCCESS)
 }
 
-fn sync_command(store: &Store, config: &config::Config) -> Result<ExitCode> {
-    git::sync(store.root(), config, "manual sync")?;
-    println!("synced {}", store.root().display());
+fn backup_command(store: &Store, config: &config::Config) -> Result<ExitCode> {
+    git::backup(store.root(), config, "manual backup")?;
+    println!("backed up {}", store.root().display());
+    Ok(ExitCode::SUCCESS)
+}
+
+fn load_command(store: &Store, config: &config::Config) -> Result<ExitCode> {
+    let backup = git::load(store.root(), config)?;
+    println!("loaded {}", store.root().display());
+
+    if let Some(backup) = backup {
+        println!("previous data backed up to {}", backup.display());
+    }
+
     Ok(ExitCode::SUCCESS)
 }
 

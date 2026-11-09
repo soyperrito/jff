@@ -494,9 +494,9 @@ fn autopush_commits_to_a_local_remote() {
 }
 
 #[test]
-fn sync_command_pushes_to_a_local_remote() {
+fn backup_command_pushes_to_a_local_remote() {
     let home = TempDir::new().expect("temp dir");
-    let remote = home.path().join("sync-remote.git");
+    let remote = home.path().join("backup-remote.git");
 
     let git = std::process::Command::new("git")
         .args(["init", "--bare", remote.to_str().expect("remote path")])
@@ -529,14 +529,14 @@ fn sync_command_pushes_to_a_local_remote() {
 
     let source = home.path().join("inbox/wind.md");
     fs::create_dir_all(source.parent().expect("inbox")).expect("inbox");
-    fs::write(&source, "# Wind\n\nManual sync test.\n").expect("source");
+    fs::write(&source, "# Wind\n\nManual backup test.\n").expect("source");
     ok(
         home.path(),
         &["create", "-t", source.to_str().expect("path")],
     );
 
-    let stdout = ok(home.path(), &["sync"]);
-    assert!(stdout.contains("synced"));
+    let stdout = ok(home.path(), &["backup"]);
+    assert!(stdout.contains("backed up"));
 
     let output = std::process::Command::new("git")
         .arg("--git-dir")
@@ -545,7 +545,67 @@ fn sync_command_pushes_to_a_local_remote() {
         .output()
         .expect("rev-parse remote");
 
-    assert!(output.status.success(), "sync did not create a commit");
+    assert!(output.status.success(), "backup did not create a commit");
+}
+
+#[test]
+fn load_command_restores_from_a_local_remote() {
+    let home = TempDir::new().expect("temp dir");
+    let remote = home.path().join("load-remote.git");
+
+    let git = std::process::Command::new("git")
+        .args(["init", "--bare", remote.to_str().expect("remote path")])
+        .current_dir(home.path())
+        .output();
+
+    let Ok(git) = git else {
+        return;
+    };
+
+    assert!(
+        git.status.success(),
+        "{}",
+        String::from_utf8_lossy(&git.stderr)
+    );
+
+    let config = serde_json::json!({
+        "git": {
+            "repo": remote,
+            "autopush": false,
+            "user": "Test User",
+            "email": "test@example.com"
+        }
+    });
+
+    fs::write(
+        home.path().join("config.json"),
+        serde_json::to_string_pretty(&config).expect("config JSON"),
+    )
+    .expect("config");
+
+    let source = home.path().join("inbox/water.md");
+    fs::create_dir_all(source.parent().expect("inbox")).expect("inbox");
+    fs::write(&source, "# Water\n\nLoaded body.\n").expect("source");
+    ok(
+        home.path(),
+        &["create", "-t", source.to_str().expect("path")],
+    );
+    ok(home.path(), &["backup"]);
+
+    let loaded_home = home.path().join("loaded");
+    fs::create_dir_all(&loaded_home).expect("loaded home");
+    fs::write(
+        loaded_home.join("config.json"),
+        serde_json::to_string_pretty(&config).expect("config JSON"),
+    )
+    .expect("loaded config");
+
+    let stdout = ok(&loaded_home, &["load"]);
+
+    assert!(stdout.contains("loaded"));
+    assert!(loaded_home.join("map.json").is_file());
+    assert!(loaded_home.join("terms/w/water.md").is_file());
+    assert!(loaded_home.join("concepts").is_dir());
 }
 
 #[test]

@@ -120,7 +120,10 @@ pub enum Command {
     },
 
     /// Commit and push the knowledge base
-    Sync,
+    Backup,
+
+    /// Load map.json, terms/ and concepts/ from the configured remote
+    Load,
 
     /// Generate shell completions
     Completions {
