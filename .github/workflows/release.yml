@@ -60,6 +60,7 @@ jobs:
           $name = "jff-$version-${{ matrix.target }}"
           New-Item -ItemType Directory -Force -Path "$name/completions", "$name/man" | Out-Null
           Copy-Item "target/${{ matrix.target }}/release/jff.exe" "$name/"
+          Copy-Item "target/${{ matrix.target }}/release/jff.exe" "jff-$version-${{ matrix.target }}.exe"
           Copy-Item -Path README.md, MANUAL.md, LICENSE, NOTICE -Destination "$name/"
           New-Item -ItemType Directory -Force -Path "$name/themes" | Out-Null
           Copy-Item -Path "themes\*" -Destination "$name/themes" -Recurse
@@ -75,6 +76,7 @@ jobs:
           path: |
             jff-*.tar.gz
             jff-*.zip
+            jff-*.exe
           if-no-files-found: ignore
 
   release:
