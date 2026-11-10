@@ -123,7 +123,12 @@ impl<'a> Renderer<'a> {
                 self.styles.push(style);
             }
             Tag::Paragraph => {
+                // A paragraph can start right after a list marker or a quote
+                // prefix was queued. Keep it so loose lists still show their
+                // bullet/number.
+                let pending = self.pending_prefix.take();
                 self.finish_line();
+                self.pending_prefix = pending;
 
                 if self.pending_prefix.is_none() {
                     if let Some(prefix) = self.item_prefix.clone() {
@@ -471,6 +476,17 @@ mod tests {
         assert!(text.contains("first"));
         assert!(text.contains("second"));
         assert!(text.contains("fn main() {}"));
+    }
+
+    #[test]
+    fn renders_bullets_and_numbers_in_loose_lists() {
+        let document = render("- one\n\n- two\n\n1. first\n\n2. second\n", &theme());
+        let text = text_of(&document);
+
+        assert!(text.contains("• one"), "bullet one missing: {text}");
+        assert!(text.contains("• two"), "bullet two missing: {text}");
+        assert!(text.contains("1. first"), "number one missing: {text}");
+        assert!(text.contains("2. second"), "number two missing: {text}");
     }
 
     #[test]
